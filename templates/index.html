@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FaceTech Monitoring Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+
+
+  <!-- Bootstrap Icons CDN -->
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="logo">
+      <i class="bi bi-person-bounding-box logo-icon"></i>
+      <span class="logo-text">FaceTech</span>
+    </div>
+    <nav class="nav-menu">
+      <a href="/" class="nav-item active">
+        <i class="bi bi-eye nav-icon"></i>
+        <span class="nav-text">Monitoring</span>
+      </a>
+      <a href="/addpeople" class="nav-item">
+        <i class="bi bi-people-fill nav-icon"></i>
+        <span class="nav-text">People Database</span>
+      </a>
+      <a href="/records"  class="nav-item">
+        <i class="bi bi-person-badge nav-icon"></i>
+        <span class="nav-text">Face Records</span>
+      </a>
+      <a href="{{ url_for('view_incidents') }}" class="nav-item">
+        <i class="bi bi-exclamation-triangle nav-icon"></i>
+        <span class="nav-text">Incidents</span>
+      </a>
+      <a href="#" class="nav-item">
+        <i class="bi bi-search nav-icon"></i>
+        <span class="nav-text">Search</span>
+      </a>
+      <a href="#" class="nav-item">
+        <i class="bi bi-calendar-date nav-icon"></i>
+        <span class="nav-text">Calendar</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <span>System active</span>
+      <div class="progress-bar"><div class="progress"></div></div>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <header class="header">
+      <div>
+        <h1>Monitoring Dashboard</h1>
+        <p class="subtitle">Live surveillance and detection</p>
+      </div>
+      <div class="header-right">
+        <div class="status">
+          <span>System Status: <strong>Active</strong></span>
+          <small>Last update: 1 min ago</small>
+        </div>
+        <div class="profile-icon">
+          <i class="bi bi-person-circle"></i>
+        </div>
+      </div>
+    </header>
+
+    <section class="stats-cards">
+      <div class="card">
+        <div>
+          <h4>Active Cameras</h4>
+          <i class="bi bi-camera"></i>
+        </div>
+        <div class="card-main">
+          <span class="stat-number">1</span>
+          <span class="stat-detail">of 2</span>
+        </div>
+        <div class="stat-change positive">+2 from yesterday</div>
+      </div>
+      <div class="card">
+        <div>
+          <h4>Face Detections Today</h4>
+          <i class="bi bi-people"></i>
+        </div>
+        <div class="card-main">
+          <span class="stat-number">127</span>
+        </div>
+        <div class="stat-change positive">+15% from yesterday</div>
+      </div>
+      <div class="card">
+        <div>
+          <h4>Unknown Faces</h4>
+          <i class="bi bi-person-x"></i>
+        </div>
+        <div class="card-main">
+          <span class="stat-number">8</span>
+        </div>
+        <div class="stat-change negative">-3 from yesterday</div>
+      </div>
+      <div class="card">
+        <div>
+          <h4>Recognized Faces</h4>
+          <i class="bi bi-person-bounding-box"></i>
+        </div>
+        <div class="card-main">
+          <span class="stat-number">0</span>
+        </div>
+        <div class="stat-change">Access granted</div>
+      </div>
+    </section>
+
+   <section class="cameras">
+        <!-- First Camera -->
+        <div class="cam-card">
+            <div>
+                <div class="cam-header">
+                    <i class="bi bi-camera"></i>
+                    <h4>Area A - Main Entrance</h4>
+                </div>
+                <small>ID: CAM-01</small>
+            </div>
+            <div class="video-container">
+                <video id="liveFeed" autoplay playsinline></video>
+                <canvas id="overlay"></canvas>
+            </div>
+            <div class="cam-status">
+                <small>STATUS: <span class="status-indicator">LIVE</span></small>
+                <button class="toggle-camera">Disconnect</button>
+            </div>
+        </div>
+
+        <!-- Second Camera -->
+        <div class="cam-card">
+            <div>
+                <div class="cam-header">
+                    <i class="bi bi-camera"></i>
+                    <h4>Area B - External Webcam</h4>
+                </div>
+                <small>ID: CAM-02</small>
+            </div>
+            <div class="video-container">
+<!--                <video id="liveFeed2" autoplay playsinline  src="rtsp://admin:Admin123@192.168.80.112:554/Streaming/Channels/101/"></video>-->
+                <video id="liveFeed2"  autoplay playsinline  src="rtsp://admin:Admin123@192.168.80.112:554/Streaming/Channels/101/url"></video>
+
+                <canvas id="overlay2"></canvas>
+            </div>
+            <div class="cam-status">
+                <small>STATUS: <span class="status-indicator">LIVE</span></small>
+                <button class="toggle-camera">Disconnect</button>
+            </div>
+        </div>
+          <div class="cam-card">
+            <div>
+                <div class="cam-header">
+                    <i class="bi bi-camera"></i>
+                    <h4>Area C - External Webcam</h4>
+                </div>
+                <small>ID: CAM-03</small>
+            </div>
+             <div class="video-container-inactive">
+                 <i class="bi bi-camera cam-icon"></i>
+            </div>
+            <div class="cam-status">
+                <small>STATUS: <span class="status-indicator">OFF</span></small>
+                <button class="toggle-camera">Disconnected</button>
+            </div>
+        </div>
+          <div class="cam-card">
+            <div>
+                <div class="cam-header">
+                    <i class="bi bi-camera"></i>
+                    <h4>Area D - External Webcam</h4>
+                </div>
+                <small>ID: CAM-04</small>
+            </div>
+            <div class="video-container-inactive">
+                 <i class="bi bi-camera cam-icon"></i>
+            </div>
+            <div class="cam-status">
+                <small>STATUS: <span class="status-indicator">OFF</span></small>
+                <button class="toggle-camera">Disconnected</button>
+            </div>
+        </div>
+    </section>
+
+    <section class="recent">
+      <div class="recent-detections">
+        <h3><i class="bi bi-emoji-smile"></i> Recent Face Detections</h3>
+        <div id="detectionsContainer"></div>
+        <div class="btn-wrapper">
+          <button class="btn-view">View All Detections</button>
+        </div>
+      </div>
+      <div class="recent-activity">
+        <h3>Recent Activity</h3>
+        <ul>
+          <li><span class="act-line positive"></span>Face ID #2174 recognized in Area B <small>14:32:15</small></li>
+          <li><span class="act-line neutral"></span>Unknown person detected in Area A <small>14:20:47</small></li>
+          <li><span class="act-line negative"></span>ALERT: Restricted person in Area C <small>13:15:22</small></li>
+          <li><span class="act-line neutral"></span>System maintenance scheduled <small>12:00:00</small></li>
+          <li><span class="act-line positive"></span>Camera #3 connection restored <small>11:45:38</small></li>
+          <li><span class="act-line positive"></span>Database backup completed <small>10:30:12</small></li>
+        </ul>
+      </div>
+    </section>
+  </main>
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
+</body>
+</html>

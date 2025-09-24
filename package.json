@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "streamedian": "github:Streamedian/html5_rtsp_player"
+  }
+}

@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Face Records & Access Status</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/records.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
+
+
+</head>
+<body>
+     <aside class="sidebar">
+        <div class="logo">
+          <i class="bi bi-person-bounding-box logo-icon"></i>
+          <span class="logo-text">FaceTech</span>
+        </div>
+        <nav class="nav-menu">
+          <a href="/" class="nav-item active">
+            <i class="bi bi-eye nav-icon"></i>
+            <span class="nav-text">Monitoring</span>
+          </a>
+          <a href="#" class="nav-item">
+            <i class="bi bi-people-fill nav-icon"></i>
+            <span class="nav-text">People Database</span>
+          </a>
+          <a href="/records" class="nav-item">
+            <i class="bi bi-person-badge nav-icon"></i>
+            <span class="nav-text">Face Records</span>
+          </a>
+          <a href="{{ url_for('view_incidents') }}" class="nav-item">
+            <i class="bi bi-exclamation-triangle nav-icon"></i>
+            <span class="nav-text">Incidents</span>
+          </a>
+          <a href="#" class="nav-item">
+            <i class="bi bi-search nav-icon"></i>
+            <span class="nav-text">Search</span>
+          </a>
+          <a href="#" class="nav-item">
+            <i class="bi bi-calendar-date nav-icon"></i>
+            <span class="nav-text">Calendar</span>
+          </a>
+        </nav>
+        <div class="sidebar-footer">
+          <span>System active</span>
+          <div class="progress-bar"><div class="progress"></div></div>
+        </div>
+     </aside>
+
+    <main class="main-content">
+         <header class="header">
+              <div>
+                <h1>Access status</h1>
+                <p class="subtitle">Monitor and analyze access control metrics</p>
+              </div>
+              <div class="header-right">
+                <div class="status">
+                  <span>System Status: <strong>Active</strong></span>
+                  <small>Last update: 1 min ago</small>
+                </div>
+                <div class="profile-icon">
+                  <i class="bi bi-person-circle"></i>
+                </div>
+              </div>
+        </header>
+
+        <!-- ACCESS STATUS SECTION -->
+        <section class="access-status-section">
+
+            <!-- TIME RANGE TABS -->
+            <div class="time-tabs">
+                <a href="?range=all" class="time-tab {% if active_range == 'all' %}active{% endif %}">All</a>
+                <a href="?range=today" class="time-tab {% if active_range == 'today' %}active{% endif %}">Today</a>
+                <a href="?range=week" class="time-tab {% if active_range == 'week' %}active{% endif %}">This Week</a>
+                <a href="?range=month" class="time-tab {% if active_range == 'month' %}active{% endif %}">This Month</a>
+            </div>
+
+            <!-- KPI CARDS -->
+            <div class="metrics-cards">
+                {% set r_pct = (kpis.recognized/kpis.total*100)|round(0) if kpis.total else 0 %}
+                {% set u_pct = (kpis.unknown/kpis.total*100)|round(0) if kpis.total else 0 %}
+                <div class="card authorized">
+                    <div class="card-body">
+                        <h3>Authorized Access</h3>
+                        <p class="small">Total authorized entries</p>
+                        <div class="stat-num">{{ kpis.recognized }}</div>
+                        <div class="progress-bar">
+                            <div class="fill" style="width: {{ r_pct }}%;"></div>
+                        </div>
+                        <small>{{ r_pct }}% of total access</small>
+                    </div>
+                    <div class="card-icon"><i class="bi bi-person-bounding-box"></i></div>
+                </div>
+
+                <div class="card unauthorized">
+                    <div class="card-body">
+                        <h3>Unauthorized Access</h3>
+                        <p class="small">Total unauthorized attempts</p>
+                        <div class="stat-num">{{ kpis.unknown }}</div>
+                        <div class="progress-bar">
+                            <div class="fill" style="width: {{ u_pct }}%;"></div>
+                        </div>
+                        <small>{{ u_pct }}% of total access</small>
+                    </div>
+          
+                    <div class="card-icon"><i class="bi bi-person-x"></i></div>
+                </div>
+
+                <div class="card total-traffic">
+                    <div class="card-body">
+                        <h3>Total Traffic</h3>
+                        <p class="small">Entries and exits combined</p>
+                        <div class="stat-num">{{ kpis.total }}</div>
+                        <div class="traffic-legend">
+                            <span><i class="fas fa-arrow-right"></i> {{ kpis.recognized }} entries</span>
+                            <span><i class="fas fa-arrow-left"></i> {{ kpis.unknown }} exits</span>
+                        </div>
+                    </div>
+                    <div class="card-icon"><i class="bi bi-people"></i></div>
+                </div>
+            </div>
+
+            <!-- DETAILS SECTION -->
+            <div class="details-section">
+                <!-- PEAK HOURS -->
+                <div class="peak-hours">
+                    <div>
+                          <h4>Peak Hours</h4>
+                          <p>Time period when observed much traffic</p>
+                    </div>
+
+                    <ul>
+                        {% set max_count = peak_hours | map(attribute='count') | max(0) %}
+                        {% for p in peak_hours %}
+                            <li>
+                                <i class="fas fa-clock"></i> {{ p.hour }}
+                                <div class="peak-bar" style="--pct: {{ (p.count/max_count*100)|round(0) if max_count else 0 }}%;"></div>
+                                <span class="count-label">{{ p.count }} accesses</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+                <!-- RECENT INCIDENTS -->
+                <div class="recent-incidents">
+                    <div class="ri-header">
+                        <div>
+                             <h4>Recent Incidents</h4>
+                             <p class="subtitle">Security concerns and unauthorized accesses</p>
+                        </div>
+
+                        <div class="ri-actions">
+                            <button id="addIncidentBtn" class="btn btn-sm btn-primary">
+                                <i class="fas fa-plus"></i> Add Incident
+                            </button>
+                            <a href="{{ url_for('view_incidents') }}" class="btn btn-sm btn-link">View All</a>
+                        </div>
+                    </div>
+                    <ul id="incidentList">
+                        {% for inc in recent_incidents[:2] %}
+                        <li class="{{ inc.status|lower }}">
+                          <div class="incident-info">
+                            <strong>{{ inc.name|capitalize }}</strong>
+                            <p>{{ inc.description|capitalize }}</p>
+                          </div>
+                          <div class="incident-meta">
+                            <time>{{ inc.timestamp.split(' ')[1] }}</time>
+                            <span class="badge {{ inc.status|lower }}">{{ inc.status }}</span>
+                          </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </section>
+        <!-- Card session -->
+        <section class="records-section">
+             <div class="pre-header">
+                <h1>Face Records</h1>
+                <input type="text" id="searchInput" placeholder="Search records..." class="search-bar" />
+            </div>
+
+            <div class="filter-bar">
+                <button class="tab active" data-filter="all">All</button>
+                <button class="tab" data-filter="recognized">Recognized</button>
+                <button class="tab" data-filter="unknown">Unknown</button>
+                <button class="tab" data-filter="entering">Entering</button>
+                <button class="tab" data-filter="exiting">Exiting</button>
+            </div>
+
+            <div id="face-container">
+
+                {% for record in records %}
+                    <div class="recognition-card">
+                            <!-- Header -->
+                            <div class="card-header">
+                                <div class="name-status">
+                                <i class="bi bi-check2-circle check-icon"></i>
+                                <span class="name">{{ record.Name }}</span>
+                                </div>
+                                <span class="reference-id">F{{ 500 + loop.index }}E</span>
+                            </div>
+            
+                            <!-- Match Info -->
+                            <div class="match-info">
+                                <div class="avatar">
+                                <i class="bi bi-person-bounding-box person-icon"></i>
+                                </div>
+                                <div class="match-score">
+                                <span class="label">Match Score</span>
+                                <span class="score">{{ record.Confidence * 100}}%</span>
+                                </div>
+                            </div>
+
+                            <!-- Details -->
+                            <div class="details">
+                                <div class="detail-item">
+                                <span class="label">Location:</span>
+                                <span class="value">Area B – Hallway</span>
+                                </div>
+                                <div class="detail-item">
+                                <span class="label">Camera ID:</span>
+                                <span class="value camera">CAM-03</span>
+                                </div>
+                                <div class="detail-item">
+                                <span class="label">Timestamp:</span>
+                                <span class="value">{{ record.Timestamp.split(' ')[1] }}</span>
+                                </div>
+                                <div class="detail-item">
+                                <span class="label">Date:</span>
+                                <span class="value">{{ record.Timestamp.split(' ')[0] }}</span>
+                                </div>
+                                <div class="detail-item">
+                                <span class="label">Status:</span>
+                                <span class="value recognized">{{ record.Status }}</span>
+                                </div>
+                            </div>
+
+                            <!-- Footer -->
+                            <div class="card-footer">
+                                <button class="view-details-button">View Details</button>
+                            </div>
+                        </div>
+                    {% endfor %}
+            </div>
+
+             <div class="pagination-controls">
+                <button id="prevBtn"><i class="fas fa-arrow-left"></i> Previous</button>
+                <span id="pageInfo">Page 1</span>
+                <button id="nextBtn">Next <i class="fas fa-arrow-right"></i></button>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- Add Incident Modal -->
+    <div id="incidentModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h3>Add New Incident</h3>
+            <form id="incidentForm">
+                <div class="form-group">
+                    <label for="incName">Name</label>
+                    <input type="text" id="incName" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="incStatus">Status</label>
+                    <select id="incStatus" name="status" required>
+                        <option value="">Select status</option>
+                        <option value="unauthorized">Unauthorized</option>
+                        <option value="suspicious">Suspicious</option>
+                        <option value="denied">Denied</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="incDesc">Description</label>
+                    <textarea id="incDesc" name="description" rows="3"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Incident</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/records.js') }}"></script>
+</body>
+</html>

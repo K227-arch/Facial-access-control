@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Add New Person</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/addpeople.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css ">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="logo">
+      <i class="bi bi-person-bounding-box logo-icon"></i>
+      <span class="logo-text">FaceTech</span>
+    </div>
+    <nav class="nav-menu">
+      <a href="/" class="nav-item active">
+        <i class="bi bi-eye nav-icon"></i>
+        <span class="nav-text">Monitoring</span>
+      </a>
+      <a href="#" class="nav-item">
+        <i class="bi bi-people-fill nav-icon"></i>
+        <span class="nav-text">People Database</span>
+      </a>
+      <a href="/records"  class="nav-item">
+        <i class="bi bi-person-badge nav-icon"></i>
+        <span class="nav-text">Face Records</span>
+      </a>
+      <a href="{{ url_for('view_incidents') }}" class="nav-item">
+        <i class="bi bi-exclamation-triangle nav-icon"></i>
+        <span class="nav-text">Incidents</span>
+      </a>
+      <a href="#" class="nav-item">
+        <i class="bi bi-search nav-icon"></i>
+        <span class="nav-text">Search</span>
+      </a>
+      <a href="#" class="nav-item">
+        <i class="bi bi-calendar-date nav-icon"></i>
+        <span class="nav-text">Calendar</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <span>System active</span>
+      <div class="progress-bar"><div class="progress"></div></div>
+    </div>
+  </aside>
+
+  <main class="main-content">
+        <header class="header">
+              <div>
+                <h1>Access status</h1>
+                <p class="subtitle">Monitor and analyze access control metrics</p>
+              </div>
+              <div class="header-right">
+                <div class="status">
+                  <span>System Status: <strong>Active</strong></span>
+                  <small>Last update: 1 min ago</small>
+                </div>
+                <div class="profile-icon">
+                  <i class="bi bi-person-circle"></i>
+                </div>
+              </div>
+        </header>
+<div class="my_body">
+    <div class="container">
+      <div class="header">
+        <div class="header-left">
+          <h1>People Database</h1>
+          <p class="subtitle">Manage all your registered people from one place</p>
+        </div>
+        <div class="header-right">
+          <input type="text" id="searchInput" placeholder="Search people..." />
+        </div>
+      </div>
+
+      <section class="people-list" id="peopleList"></section>
+    </div><div>
+       <section class="stats">
+          <div class="card stats-card">
+            <div class="stat-number" id="totalUsers">0</div>
+            <div class="stat-label">Registered Users</div>
+            <small class="stat-subtext"><span id="totalUsersText">0</span> total users in database</small>
+          </div>
+        </section>
+
+      <div class="add-people-container">
+          <h4 class="page-title">Add New Person</h4>
+
+          <div class="counter-box">
+            <p id="image-count" align="center">
+              You have uploaded <span id="current-count">{{ existing_count or 0 }}</span> images so far.
+            </p>
+          </div>
+
+          <div id="toast" class="toast"></div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                <div class="flash-messages">
+                  {% for category, msg in messages %}
+                    <div class="alert alert-{{ category }}">{{ msg }}</div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            {% endwith %}
+
+          <form class="add-people-form" method="POST" enctype="multipart/form-data">
+            <div class="form-group floating-label">
+              <input type="text" id="name" name="name" value="{{ name or '' }}" required placeholder=" ">
+              <label for="name">Enter full name</label>
+            </div>
+
+            <div class="form-group drop-zone" id="drop-zone" data-min-images="{{ MIN_IMAGES_REQUIRED }}">
+              <p class="drop-text">Drag & drop photos here, or click to select</p>
+              <input type="file" id="photos" name="photos" class="form-control-file" accept="image/*" multiple required>
+              <small class="form-text text-muted">
+                At least {{ MIN_IMAGES_REQUIRED }} images required to train. You can upload more later.
+              </small>
+            </div>
+
+            <div class="preview-container" id="preview"></div>
+
+            <!-- Buttons -->
+          <div class="button-group" id="action-buttons">
+            <button type="submit" class="btn btn-primary" name="action" value="save">Save</button>
+            <button type="submit" class="btn btn-success" name="action" value="train" id="train-btn">Train Model</button>
+          </div>
+
+          </form>
+        </div>
+     </div>
+    </div>
+
+
+
+
+  </main>
+
+  <script src="{{ url_for('static', filename='js/addpeople.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+onnxruntime==1.19.2
+pip install onnxruntime-gpu
+onnx
+insightface==0.7.3
+catboost==1.2.8
+opencv-python
+numpy
+pandas
+tqdm
+scipy
+numpy
+scikit-learn
+werkzeug
+flask
+flask-cors
+flask-socketio
