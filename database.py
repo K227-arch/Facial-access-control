@@ -16,7 +16,8 @@ def get_db_connection():
 def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
-    # Create table if not exists
+    
+    # Create FaceRecords table if not exists
     cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='FaceRecords'")
     if not cur.fetchone():
         cur.execute("""
@@ -29,9 +30,22 @@ def init_db():
                 BoundingBox TEXT,
                 Embedding BLOB
             )
-        """
-        )
-        conn.commit()
+        """)
+        
+    # Create Incidents table if not exists
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='Incidents'")
+    if not cur.fetchone():
+        cur.execute("""
+            CREATE TABLE Incidents (
+                IncidentID INTEGER PRIMARY KEY AUTOINCREMENT,
+                Name TEXT,
+                Status TEXT NOT NULL,
+                Description TEXT,
+                Timestamp TEXT
+            )
+        """)
+        
+    conn.commit()
     conn.close()
 
 
@@ -135,18 +149,7 @@ def save_incident(name, status, description=None, timestamp=None):
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # Create Incidents table if it doesn't exist
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS Incidents (
-            IncidentID INTEGER PRIMARY KEY AUTOINCREMENT,
-            Name TEXT,
-            Status TEXT NOT NULL,
-            Description TEXT,
-            Timestamp TEXT
-        )
-    """)
-
-    # Insert the incident record
+    # Insert the incident record (table already created in init_db)
     cur.execute(
         """
         INSERT INTO Incidents (Name, Status, Description, Timestamp)
@@ -160,15 +163,15 @@ def save_incident(name, status, description=None, timestamp=None):
 
 
 def get_all_incidents():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT name, status, description, timestamp FROM incidents ORDER BY timestamp DESC")
-    results = c.fetchall()
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT Name, Status, Description, Timestamp FROM Incidents ORDER BY Timestamp DESC")
+    results = cur.fetchall()
     conn.close()
 
     return [{
-        'name': row[0],
-        'status': row[1],
-        'description': row[2],
-        'timestamp': row[3]
+        'name': row['Name'],
+        'status': row['Status'],
+        'description': row['Description'],
+        'timestamp': row['Timestamp']
     } for row in results]

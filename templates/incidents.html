@@ -11,42 +11,7 @@
 <body>
     <!-- NAVBAR -->
 
-   <aside class="sidebar">
-    <div class="logo">
-      <i class="bi bi-person-bounding-box logo-icon"></i>
-      <span class="logo-text">FaceTech</span>
-    </div>
-    <nav class="nav-menu">
-      <a href="/" class="nav-item active">
-        <i class="bi bi-eye nav-icon"></i>
-        <span class="nav-text">Monitoring</span>
-      </a>
-      <a href="#" class="nav-item">
-        <i class="bi bi-people-fill nav-icon"></i>
-        <span class="nav-text">People Database</span>
-      </a>
-      <a href="/records"  class="nav-item">
-        <i class="bi bi-person-badge nav-icon"></i>
-        <span class="nav-text">Face Records</span>
-      </a>
-      <a href="{{ url_for('view_incidents') }}" class="nav-item">
-        <i class="bi bi-exclamation-triangle nav-icon"></i>
-        <span class="nav-text">Incidents</span>
-      </a>
-      <a href="#" class="nav-item">
-        <i class="bi bi-search nav-icon"></i>
-        <span class="nav-text">Search</span>
-      </a>
-      <a href="#" class="nav-item">
-        <i class="bi bi-calendar-date nav-icon"></i>
-        <span class="nav-text">Calendar</span>
-      </a>
-    </nav>
-    <div class="sidebar-footer">
-      <span>System active</span>
-      <div class="progress-bar"><div class="progress"></div></div>
-    </div>
-  </aside>
+   {% include '_navigation.html' %}
 
   
 

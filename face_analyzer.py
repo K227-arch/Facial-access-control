@@ -18,13 +18,25 @@ class FaceAnalyzer:
     def _load_models(self):
         """Load InsightFace detection and recognition models"""
         logger.info("Loading InsightFace models...")
-
-        det_model = model_zoo.get_model(DETECTION_MODEL_PATH, task='detection')
-        rec_model = model_zoo.get_model(RECOGNITION_MODEL_PATH, task='recognition')
-
-        self.app.det_model = det_model
-        self.app.rec_model = rec_model
-        self.app.models = {'detection': det_model, 'recognition': rec_model}
+        
+        try:
+            # Try to load models if they exist
+            if os.path.exists(DETECTION_MODEL_PATH):
+                det_model = model_zoo.get_model(DETECTION_MODEL_PATH, task='detection')
+                self.app.det_model = det_model
+                logger.info(f"Detection model loaded from {DETECTION_MODEL_PATH}")
+            else:
+                logger.warning(f"Detection model not found at {DETECTION_MODEL_PATH}, using default")
+                
+            if os.path.exists(RECOGNITION_MODEL_PATH):
+                rec_model = model_zoo.get_model(RECOGNITION_MODEL_PATH, task='recognition')
+                self.app.rec_model = rec_model
+                logger.info(f"Recognition model loaded from {RECOGNITION_MODEL_PATH}")
+            else:
+                logger.warning(f"Recognition model not found at {RECOGNITION_MODEL_PATH}, using default")
+                
+        except Exception as e:
+            logger.error(f"Error loading custom models: {e}, falling back to defaults")
 
     def _prepare(self):
         """Prepare the model for inference"""

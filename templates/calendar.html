@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendar - FaceTech</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css">
+    <style>
+        .calendar-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .calendar-nav {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .nav-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 1px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .calendar-day {
+            background: white;
+            padding: 15px 10px;
+            min-height: 120px;
+            position: relative;
+        }
+        .calendar-day.header {
+            background: #f8f9fa;
+            min-height: auto;
+            padding: 15px 10px;
+            font-weight: bold;
+            text-align: center;
+            color: #666;
+        }
+        .calendar-day.other-month {
+            background: #f8f9fa;
+            color: #ccc;
+        }
+        .calendar-day.today {
+            background: #e3f2fd;
+        }
+        .day-number {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .day-events {
+            font-size: 11px;
+        }
+        .event-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .event-recognized { background: #28a745; }
+        .event-unknown { background: #dc3545; }
+        .event-incident { background: #ffc107; }
+        .stats-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    {% include '_navigation.html' %}
+
+    <main class="main-content">
+        <header class="header">
+            <div>
+                <h1><i class="bi bi-calendar-date"></i> Detection Calendar</h1>
+                <p class="subtitle">View face detection history by date</p>
+            </div>
+        </header>
+
+        <div class="calendar-container">
+            <div class="stats-summary">
+                <div class="stat-card">
+                    <div class="stat-number" id="monthlyTotal">0</div>
+                    <div>Total Detections This Month</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="monthlyRecognized">0</div>
+                    <div>Recognized Faces</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="monthlyUnknown">0</div>
+                    <div>Unknown Faces</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="monthlyIncidents">0</div>
+                    <div>Security Incidents</div>
+                </div>
+            </div>
+
+            <div class="calendar-header">
+                <h2 id="currentMonth">January 2026</h2>
+                <div class="calendar-nav">
+                    <button class="nav-btn" onclick="previousMonth()">
+                        <i class="bi bi-chevron-left"></i> Previous
+                    </button>
+                    <button class="nav-btn" onclick="today()">
+                        <i class="bi bi-calendar-today"></i> Today
+                    </button>
+                    <button class="nav-btn" onclick="nextMonth()">
+                        Next <i class="bi bi-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="calendar-grid" id="calendarGrid">
+                <!-- Calendar will be generated by JavaScript -->
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let currentDate = new Date();
+        
+        function generateCalendar(year, month) {
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const startDate = new Date(firstDay);
+            startDate.setDate(startDate.getDate() - firstDay.getDay());
+            
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+            
+            // Add day headers
+            const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            dayHeaders.forEach(day => {
+                const dayElement = document.createElement('div');
+                dayElement.className = 'calendar-day header';
+                dayElement.textContent = day;
+                grid.appendChild(dayElement);
+            });
+            
+            // Add calendar days
+            const currentDateObj = new Date();
+            for (let i = 0; i < 42; i++) {
+                const date = new Date(startDate);
+                date.setDate(startDate.getDate() + i);
+                
+                const dayElement = document.createElement('div');
+                dayElement.className = 'calendar-day';
+                
+                if (date.getMonth() !== month) {
+                    dayElement.classList.add('other-month');
+                }
+                
+                if (date.toDateString() === currentDateObj.toDateString()) {
+                    dayElement.classList.add('today');
+                }
+                
+                dayElement.innerHTML = `
+                    <div class="day-number">${date.getDate()}</div>
+                    <div class="day-events" id="events-${date.toISOString().split('T')[0]}">
+                        <!-- Events will be loaded here -->
+                    </div>
+                `;
+                
+                grid.appendChild(dayElement);
+            }
+            
+            // Update month header
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                              'July', 'August', 'September', 'October', 'November', 'December'];
+            document.getElementById('currentMonth').textContent = `${monthNames[month]} ${year}`;
+            
+            // Load events for this month (simulated data)
+            loadMonthEvents(year, month);
+        }
+        
+        function loadMonthEvents(year, month) {
+            // Simulate loading events - in a real app, this would fetch from the server
+            const today = new Date();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            
+            let totalDetections = 0;
+            let recognizedCount = 0;
+            let unknownCount = 0;
+            let incidentCount = 0;
+            
+            for (let day = 1; day <= daysInMonth; day++) {
+                const date = new Date(year, month, day);
+                const dateStr = date.toISOString().split('T')[0];
+                const eventsElement = document.getElementById(`events-${dateStr}`);
+                
+                if (eventsElement && date <= today) {
+                    // Simulate some random events
+                    const dailyDetections = Math.floor(Math.random() * 15);
+                    const dailyRecognized = Math.floor(dailyDetections * 0.7);
+                    const dailyUnknown = dailyDetections - dailyRecognized;
+                    const dailyIncidents = Math.random() > 0.9 ? 1 : 0;
+                    
+                    totalDetections += dailyDetections;
+                    recognizedCount += dailyRecognized;
+                    unknownCount += dailyUnknown;
+                    incidentCount += dailyIncidents;
+                    
+                    let eventsHtml = '';
+                    if (dailyRecognized > 0) {
+                        eventsHtml += `<div><span class="event-dot event-recognized"></span>${dailyRecognized} recognized</div>`;
+                    }
+                    if (dailyUnknown > 0) {
+                        eventsHtml += `<div><span class="event-dot event-unknown"></span>${dailyUnknown} unknown</div>`;
+                    }
+                    if (dailyIncidents > 0) {
+                        eventsHtml += `<div><span class="event-dot event-incident"></span>${dailyIncidents} incident</div>`;
+                    }
+                    
+                    eventsElement.innerHTML = eventsHtml;
+                }
+            }
+            
+            // Update stats
+            document.getElementById('monthlyTotal').textContent = totalDetections;
+            document.getElementById('monthlyRecognized').textContent = recognizedCount;
+            document.getElementById('monthlyUnknown').textContent = unknownCount;
+            document.getElementById('monthlyIncidents').textContent = incidentCount;
+        }
+        
+        function previousMonth() {
+            currentDate.setMonth(currentDate.getMonth() - 1);
+            generateCalendar(currentDate.getFullYear(), currentDate.getMonth());
+        }
+        
+        function nextMonth() {
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            generateCalendar(currentDate.getFullYear(), currentDate.getMonth());
+        }
+        
+        function today() {
+            currentDate = new Date();
+            generateCalendar(currentDate.getFullYear(), currentDate.getMonth());
+        }
+        
+        // Initialize calendar
+        document.addEventListener('DOMContentLoaded', function() {
+            generateCalendar(currentDate.getFullYear(), currentDate.getMonth());
+        });
+    </script>
+</body>
+</html>

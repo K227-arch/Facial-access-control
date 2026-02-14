@@ -2,21 +2,9 @@ import os
 import threading
 from flask import Flask, request, jsonify, render_template, redirect, url_for, flash, send_from_directory
 from flask_cors import CORS
-# import app as ap
-from flask import Flask, request, jsonify
 import numpy as np
-
-# start deepsort
-
-from deep_sort.deep_sort import nn_matching
-from deep_sort.deep_sort.detection import Detection
-from deep_sort.deep_sort.tracker import Tracker
-
-# end deepsort
 import base64
 from datetime import datetime
-from face_analyzer import FaceAnalyzer
-from classifier import FaceClassifier, retrain_model
 from config import STATUS_COLORS
 from utils import rgb_to_hex
 from database import (
@@ -31,6 +19,21 @@ from database import (
 )
 import cv2
 from werkzeug.utils import secure_filename
+
+# Try to import face analyzer and classifier, handle gracefully if missing
+try:
+    from face_analyzer import FaceAnalyzer
+    FACE_ANALYZER_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Face analyzer not available: {e}")
+    FACE_ANALYZER_AVAILABLE = False
+
+try:
+    from classifier import FaceClassifier, retrain_model
+    CLASSIFIER_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Classifier not available: {e}")
+    CLASSIFIER_AVAILABLE = False
 
 # Configuration
 DATASET_DIR = './facedata'
@@ -47,8 +50,26 @@ CORS(app)
 
 # Initialize database and models
 init_db()
-analyzer = FaceAnalyzer()
-classifier = FaceClassifier()
+
+# Initialize models if available
+analyzer = None
+classifier = None
+
+if FACE_ANALYZER_AVAILABLE:
+    try:
+        analyzer = FaceAnalyzer()
+        print("Face analyzer initialized successfully")
+    except Exception as e:
+        print(f"Failed to initialize face analyzer: {e}")
+        analyzer = None
+
+if CLASSIFIER_AVAILABLE:
+    try:
+        classifier = FaceClassifier()
+        print("Classifier initialized successfully")
+    except Exception as e:
+        print(f"Failed to initialize classifier: {e}")
+        classifier = None
 
 # Thread-safe retraining
 retraining_lock = threading.Lock()
@@ -57,22 +78,33 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def background_retrain():
+    if not analyzer:
+        flash("Face analyzer not available for training", "error")
+        return
+        
     if retraining_lock.locked():
         return
 
     with retraining_lock:
         try:
-            flash("Starting retraining...","info")
-            retrain_model(analyzer)
-            print("Retraining complete")
-            flash("Starting retraining...","info")
-
+            flash("Starting retraining...", "info")
+            if CLASSIFIER_AVAILABLE:
+                retrain_model(analyzer)
+                print("Retraining complete")
+                flash("Retraining complete", "success")
+            else:
+                flash("Classifier not available for training", "error")
         except Exception as e:
             print(f"Retraining failed: {e}")
+            flash(f"Retraining failed: {e}", "error")
 
 @app.route('/')
 def home():
-    return render_template('index.html')
+    return render_template('index.html', current_page='home')
+
+@app.route('/camera-test')
+def camera_test():
+    return render_template('camera_test.html', current_page='camera-test')
 
 @app.route('/records')
 def records_page():
@@ -89,7 +121,8 @@ def records_page():
                                peak_hours=peak_hours,
                                recent_incidents=recent_incidents,
                                active_range=range_filter,
-                               timestamp=datetime.now().timestamp()
+                               timestamp=datetime.now().timestamp(),
+                               current_page='records'
                                )
     except Exception as e:
         print(f"Error: {e}")
@@ -173,9 +206,14 @@ def add_people():
 
         # Trigger training if "Train Model" was clicked
         if action == 'train':
-            # threading.Thread(target=background_retrain).start()
-            retrain_model(analyzer)
-            flash('Model training started in the background.', 'info')
+            if analyzer and CLASSIFIER_AVAILABLE:
+                try:
+                    retrain_model(analyzer)
+                    flash('Model training completed successfully.', 'success')
+                except Exception as e:
+                    flash(f'Model training failed: {e}', 'error')
+            else:
+                flash('Training not available - missing dependencies.', 'warning')
 
         return redirect(url_for('add_people', name=name))
 
@@ -183,7 +221,8 @@ def add_people():
         'addpeople.html',
         MIN_IMAGES_REQUIRED=MIN_IMAGES_REQUIRED,
         existing_count=existing_count,
-        name=name
+        name=name,
+        current_page='addpeople'
     )
 
 
@@ -191,7 +230,7 @@ def add_people():
 def view_incidents():
     try:
         all_incidents = get_all_incidents()
-        return render_template('incidents.html', incidents=all_incidents)
+        return render_template('incidents.html', incidents=all_incidents, current_page='incidents')
     except Exception as e:
         print(f"Error: {e}")
         return "Server Error", 500
@@ -217,27 +256,42 @@ def add_incident():
     })
 
 
+@app.route('/search')
+def search_page():
+    """Search page for finding face records"""
+    return render_template('search.html', current_page='search')
+
+
+@app.route('/calendar')
+def calendar_page():
+    """Calendar page for viewing detection history"""
+    return render_template('calendar.html', current_page='calendar')
+
+
+@app.route('/api/search')
+def search_records():
+    """API endpoint for searching face records"""
+    query = request.args.get('q', '').strip()
+    date_from = request.args.get('from', '')
+    date_to = request.args.get('to', '')
+    
+    # Basic search implementation
+    records = get_records('all')
+    
+    if query:
+        records = [r for r in records if query.lower() in r['Name'].lower()]
+    
+    return jsonify(records)
+
+
 # /////////////////////////////
 
 
 
 
-# Global tracker state
-tracker = None
-metric = nn_matching.NearestNeighborDistanceMetric("cosine", 0.5)
-track_info = {}
-MIN_RECOGNITION_COUNT = 3
-MIN_CONFIDENCE = 0.6
-
-
 @app.route('/getdata/', methods=['POST'])
 def get_data():
-    global tracker, track_info
-
-    # Initialize tracker if not exists
-    if tracker is None:
-        tracker = Tracker(metric)
-
+    """Simple face detection endpoint without tracking"""
     data = request.get_json() or {}
     image_b64 = data.get('image', '')
 
@@ -251,132 +305,58 @@ def get_data():
     except Exception as e:
         return jsonify(error=f"Invalid image data: {str(e)}"), 400
 
-    # Detect faces
-    faces = analyzer.analyze(frame)
-
-    # Create DeepSORT detections
-    detections = []
-    for face in faces:
-        x1, y1, x2, y2 = face.bbox
-        w, h = x2 - x1, y2 - y1
-        detections.append(Detection(
-            [x1, y1, w, h],
-            1.0,  # Detection confidence
-            face.embedding  # Appearance features
-        ))
-
-    # Update tracker
-    tracker.predict()
-    tracker.update(detections)
-
     results = []
-    active_tracks = set()
+    
+    if not analyzer:
+        # Return a demo result if analyzer is not available
+        return jsonify([{
+            'bbox': [100, 100, 200, 200],
+            'status': 'unknown',
+            'label': 'Demo Mode',
+            'confidence': 0.0,
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'color': rgb_to_hex(STATUS_COLORS.get('unknown', (255, 255, 0))),
+            'track_id': 1
+        }])
 
-    # Process each active track
-    for track in tracker.tracks:
-        if not track.is_confirmed() or track.time_since_update > 0:
-            continue
-
-        track_id = track.track_id
-        active_tracks.add(track_id)
-
-        # Initialize track info if new
-        if track_id not in track_info:
-            track_info[track_id] = {
-                'recognized_count': 0,
-                'unrecognized_count': 0,
-                'label': None,
-                'confidence': 0.0,
-                'last_feature': None,
-                'status': 'unknown',
-                'last_updated': datetime.now()
-            }
-
-        info = track_info[track_id]
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        current_feature = None
-
-        # Find matching detection for this track
-        for detection in detections:
-            # Use bounding box distance to match track to detection
-            track_bbox = track.to_tlbr()
-            det_bbox = detection.to_tlbr()
-            iou = bb_intersection_over_union(track_bbox, det_bbox)
-
-            if iou > 0.5:  # Consider it a match if IOU > 50%
-                current_feature = detection.feature
-                info['last_feature'] = current_feature
-                break
-
-        # If no current feature, use last stored feature
-        if current_feature is None and info['last_feature'] is not None:
-            current_feature = info['last_feature']
-
-        # Only attempt recognition if we have features and haven't reached recognition count
-        if current_feature is not None and info['recognized_count'] < MIN_RECOGNITION_COUNT:
-            status, label, conf = classifier.classify(current_feature)
-
-            if status == 'recognized' and conf > MIN_CONFIDENCE:
-                info['recognized_count'] += 1
-                info['unrecognized_count'] = 0
-                info['label'] = label
-                info['confidence'] = conf
-                info['status'] = 'recognized'
-                save_face_record(label, conf, track.to_tlbr().tolist(), current_feature, timestamp)
+    try:
+        # Detect faces using the analyzer
+        faces = analyzer.analyze(frame)
+        
+        for i, face in enumerate(faces):
+            # Convert NumPy types to Python native types for JSON serialization
+            x1, y1, x2, y2 = face.bbox
+            x1, y1, x2, y2 = float(x1), float(y1), float(x2), float(y2)
+            
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            # Try to classify if classifier is available
+            if classifier:
+                try:
+                    status, label, conf = classifier.classify(face.embedding)
+                    if status == 'recognized':
+                        save_face_record(label, float(conf), [x1, y1, x2, y2], face.embedding, timestamp)
+                except Exception as e:
+                    print(f"Classification error: {e}")
+                    status, label, conf = 'unknown', 'Unknown', 0.0
             else:
-                info['unrecognized_count'] += 1
-                info['status'] = 'unknown'
-
-                # Stop recognizing after 3 unrecognized attempts
-                if info['unrecognized_count'] >= MIN_RECOGNITION_COUNT:
-                    info['status'] = 'unknown_permanent'
-        elif info['recognized_count'] >= MIN_RECOGNITION_COUNT:
-            # Use stored recognition info
-            status = 'recognized'
-            label = info['label']
-            conf = info['confidence']
-            info['status'] = 'recognized_permanent'
-        else:
-            # Not enough recognition attempts
-            status = info['status']
-            label = info['label']
-            conf = info['confidence']
-
-        # Prepare result
-        results.append({
-            'bbox': track.to_tlbr().tolist(),
-            'status': status,
-            'label': label,
-            'confidence': conf,
-            'timestamp': timestamp,
-            'color': rgb_to_hex(STATUS_COLORS.get(status, (255, 255, 0))),
-            'track_id': track_id
-        })
-
-    # Cleanup tracks that are no longer active
-    for track_id in list(track_info.keys()):
-        if track_id not in active_tracks:
-            # Only remove if not permanently recognized
-            if track_info[track_id].get('status') not in ['recognized_permanent', 'recognized']:
-                del track_info[track_id]
+                status, label, conf = 'unknown', 'No Classifier', 0.0
+            
+            results.append({
+                'bbox': [x1, y1, x2, y2],
+                'status': status,
+                'label': label,
+                'confidence': float(conf),
+                'timestamp': timestamp,
+                'color': rgb_to_hex(STATUS_COLORS.get(status, (255, 255, 0))),
+                'track_id': i + 1
+            })
+            
+    except Exception as e:
+        print(f"Face detection error: {e}")
+        return jsonify(error=f"Face detection failed: {str(e)}"), 500
 
     return jsonify(results)
-
-
-def bb_intersection_over_union(boxA, boxB):
-    # Calculate Intersection over Union (IOU) of two bounding boxes
-    xA = max(boxA[0], boxB[0])
-    yA = max(boxA[1], boxB[1])
-    xB = min(boxA[2], boxB[2])
-    yB = min(boxA[3], boxB[3])
-
-    interArea = max(0, xB - xA + 1) * max(0, yB - yA + 1)
-
-    boxAArea = (boxA[2] - boxA[0] + 1) * (boxA[3] - boxA[1] + 1)
-    boxBArea = (boxB[2] - boxB[0] + 1) * (boxB[3] - boxB[1] + 1)
-
-    iou = interArea / float(boxAArea + boxBArea - interArea)
-    return iou
 
 # //////////////////////////////////////////////////////
 

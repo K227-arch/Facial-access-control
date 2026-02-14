@@ -1,2 +1,10 @@
 /FaceRecognitionModels/
+
+# Trained model files (too large for Git)
+Models/*.pkl
+*.pkl
+
+# Database files
+instance/*.db
+*.db
 /FaceRecon/facereconenv/

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        video { width: 640px; height: 480px; border: 2px solid #333; }
+        .status { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button { padding: 10px 20px; margin: 5px; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <h1>Camera Test & Diagnostics</h1>
+    
+    <div id="status" class="status info">Initializing...</div>
+    
+    <video id="testVideo" autoplay playsinline muted></video>
+    <br>
+    
+    <button onclick="testCamera()">Test Camera Access</button>
+    <button onclick="listDevices()">List Devices</button>
+    <button onclick="testDetection()">Test Face Detection</button>
+    
+    <div id="deviceList"></div>
+    <div id="detectionResult"></div>
+
+    <script>
+        const video = document.getElementById('testVideo');
+        const status = document.getElementById('status');
+        
+        function updateStatus(message, type = 'info') {
+            status.textContent = message;
+            status.className = `status ${type}`;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+        
+        async function testCamera() {
+            try {
+                updateStatus('Requesting camera access...', 'info');
+                
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { min: 640, ideal: 1280 },
+                        height: { min: 480, ideal: 720 }
+                    }
+                });
+                
+                video.srcObject = stream;
+                updateStatus('✅ Camera access successful!', 'success');
+                
+                video.onloadedmetadata = () => {
+                    updateStatus(`✅ Video loaded: ${video.videoWidth}x${video.videoHeight}`, 'success');
+                };
+                
+            } catch (error) {
+                updateStatus(`❌ Camera error: ${error.name} - ${error.message}`, 'error');
+                console.error('Camera error:', error);
+            }
+        }
+        
+        async function listDevices() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                
+                const deviceList = document.getElementById('deviceList');
+                deviceList.innerHTML = '<h3>Available Cameras:</h3>';
+                
+                if (videoDevices.length === 0) {
+                    deviceList.innerHTML += '<p>❌ No video devices found</p>';
+                } else {
+                    videoDevices.forEach((device, index) => {
+                        deviceList.innerHTML += `<p>📹 Camera ${index}: ${device.label || 'Unknown Camera'}</p>`;
+                    });
+                }
+                
+                updateStatus(`Found ${videoDevices.length} camera(s)`, videoDevices.length > 0 ? 'success' : 'error');
+                
+            } catch (error) {
+                updateStatus(`❌ Device enumeration error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testDetection() {
+            if (!video.srcObject) {
+                updateStatus('❌ Please test camera access first', 'error');
+                return;
+            }
+            
+            try {
+                updateStatus('Testing face detection...', 'info');
+                
+                // Capture frame
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0);
+                const frameData = canvas.toDataURL('image/jpeg', 0.7);
+                
+                // Send to detection endpoint
+                const response = await fetch('/getdata/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: frameData })
+                });
+                
+                const result = await response.json();
+                
+                const detectionResult = document.getElementById('detectionResult');
+                detectionResult.innerHTML = `
+                    <h3>Detection Result:</h3>
+                    <pre>${JSON.stringify(result, null, 2)}</pre>
+                `;
+                
+                if (Array.isArray(result) && result.length > 0) {
+                    updateStatus(`✅ Detected ${result.length} face(s)!`, 'success');
+                } else {
+                    updateStatus('ℹ️ No faces detected in current frame', 'info');
+                }
+                
+            } catch (error) {
+                updateStatus(`❌ Detection error: ${error.message}`, 'error');
+            }
+        }
+        
+        // Auto-start diagnostics
+        document.addEventListener('DOMContentLoaded', () => {
+            updateStatus('Ready for testing. Click "Test Camera Access" to begin.', 'info');
+            listDevices();
+        });
+    </script>
+</body>
+</html>

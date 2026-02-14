@@ -17,28 +17,56 @@ logger = logging.getLogger(__name__)
 class FaceClassifier:
     def __init__(self):
         logger.info("Loading classifier models...")
-        with open(ISOLATION_FOREST_PATH, 'rb') as f:
-            self.iso_forest = pickle.load(f)
-        with open(SVM_MODEL_PATH, 'rb') as f:
-            self.model = pickle.load(f)
-        with open(LABEL_ENCODER_PATH, 'rb') as f:
-            self.le = pickle.load(f)
-        logger.info("Classifier models loaded.")
+        self.iso_forest = None
+        self.model = None
+        self.le = None
+        
+        try:
+            if os.path.exists(ISOLATION_FOREST_PATH):
+                with open(ISOLATION_FOREST_PATH, 'rb') as f:
+                    self.iso_forest = pickle.load(f)
+                logger.info("Isolation forest model loaded.")
+            else:
+                logger.warning(f"Isolation forest model not found at {ISOLATION_FOREST_PATH}")
+                
+            if os.path.exists(SVM_MODEL_PATH):
+                with open(SVM_MODEL_PATH, 'rb') as f:
+                    self.model = pickle.load(f)
+                logger.info("Classification model loaded.")
+            else:
+                logger.warning(f"Classification model not found at {SVM_MODEL_PATH}")
+                
+            if os.path.exists(LABEL_ENCODER_PATH):
+                with open(LABEL_ENCODER_PATH, 'rb') as f:
+                    self.le = pickle.load(f)
+                logger.info("Label encoder loaded.")
+            else:
+                logger.warning(f"Label encoder not found at {LABEL_ENCODER_PATH}")
+                
+        except Exception as e:
+            logger.error(f"Error loading classifier models: {e}")
 
     def classify(self, embedding):
         """Classify a face embedding"""
-        is_outlier = self.iso_forest.predict([embedding])[0]
-        if is_outlier == -1:
-            return "unknown", "Unknown", 0.0
+        if not all([self.iso_forest, self.model, self.le]):
+            return "unknown", "Models not loaded", 0.0
+            
+        try:
+            is_outlier = self.iso_forest.predict([embedding])[0]
+            if is_outlier == -1:
+                return "unknown", "Unknown", 0.0
 
-        pred = self.model.predict([embedding])[0]
-        label = self.le.inverse_transform([pred])[0]
-        confidence = float(self.model.predict_proba([embedding]).max())
+            pred = self.model.predict([embedding])[0]
+            label = self.le.inverse_transform([pred])[0]
+            confidence = float(self.model.predict_proba([embedding]).max())
 
-        if confidence >= CONFIDENCE_THRESHOLD:
-            return "recognized", label, confidence
+            if confidence >= CONFIDENCE_THRESHOLD:
+                return "recognized", label, confidence
 
-        return "processing", "Process...", confidence
+            return "processing", "Process...", confidence
+        except Exception as e:
+            logger.error(f"Classification error: {e}")
+            return "unknown", "Classification Error", 0.0
 
 
 

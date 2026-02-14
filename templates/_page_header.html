@@ -1,0 +1,48 @@
+<!-- Page Header Template - Include in all pages -->
+<header class="header">
+    <div>
+        <h1>
+            {% if current_page == 'home' %}
+                <i class="bi bi-eye"></i> Monitoring Dashboard
+            {% elif current_page == 'addpeople' %}
+                <i class="bi bi-people-fill"></i> People Database
+            {% elif current_page == 'records' %}
+                <i class="bi bi-person-badge"></i> Face Records
+            {% elif current_page == 'incidents' %}
+                <i class="bi bi-exclamation-triangle"></i> Security Incidents
+            {% elif current_page == 'search' %}
+                <i class="bi bi-search"></i> Search Records
+            {% elif current_page == 'calendar' %}
+                <i class="bi bi-calendar-date"></i> Detection Calendar
+            {% else %}
+                <i class="bi bi-house"></i> FaceTech System
+            {% endif %}
+        </h1>
+        <p class="subtitle">
+            {% if current_page == 'home' %}
+                Live surveillance and detection
+            {% elif current_page == 'addpeople' %}
+                Add and manage people in the database
+            {% elif current_page == 'records' %}
+                View face detection history and analytics
+            {% elif current_page == 'incidents' %}
+                Monitor security incidents and alerts
+            {% elif current_page == 'search' %}
+                Find and filter detection records
+            {% elif current_page == 'calendar' %}
+                View detection history by date
+            {% else %}
+                Face recognition and access control system
+            {% endif %}
+        </p>
+    </div>
+    <div class="header-right">
+        <div class="status">
+            <span>System Status: <strong>Active</strong></span>
+            <small>Last update: 1 min ago</small>
+        </div>
+        <div class="profile-icon">
+            <i class="bi bi-person-circle"></i>
+        </div>
+    </div>
+</header>

@@ -372,8 +372,12 @@ async function initializeCameraSystems() {
             const canvasElement = cameraCard.querySelector('canvas');
             const toggleButton = cameraCard.querySelector('.toggle-camera');
 
+            // Only initialize cameras that have video elements (active cameras)
             if (videoElement && canvasElement && toggleButton) {
                 new CameraSystem(videoElement, canvasElement, toggleButton, index);
+            } else {
+                // For inactive cameras, just log that they're skipped
+                console.log(`Camera ${index + 1} (${cameraCard.querySelector('h4')?.textContent || 'Unknown'}) is inactive - skipping initialization`);
             }
         }
     } catch (error) {
