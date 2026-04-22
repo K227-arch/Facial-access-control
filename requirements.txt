@@ -1,4 +1,4 @@
-onnxruntime==1.19.2
+onnxruntime
 onnx
 insightface==0.7.3
 catboost==1.2.8

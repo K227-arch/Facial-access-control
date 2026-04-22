@@ -24,45 +24,58 @@ class CameraSystem {
     }
 
     async initializeCamera() {
+        this.updateButtonState('Connect', 'OFFLINE', 'status-offline');
+        this.setupEventListeners();
+        // Auto-connect if a camera is available
         try {
-            await this.setupMediaStream();
-            this.setupEventListeners();
-            this.startProcessing();
-            this.updateButtonState('Disconnect', 'LIVE', 'status-live');
+            await this.connectCamera();
         } catch (error) {
-            console.error(`Camera ${this.cameraIndex} initialization failed:`, error);
-            this.handleCameraError();
+            // connectCamera handles its own errors, nothing to do here
         }
     }
 
     async setupMediaStream() {
+        // First request permission with a basic constraint so browser prompts the user
+        // and device IDs become available
+        const initialStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        initialStream.getTracks().forEach(t => t.stop()); // release immediately
+
+        // Now enumerate with real device IDs
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter(device => device.kind === 'videoinput');
 
-        if (videoDevices.length <= this.cameraIndex) {
-            throw new Error(`Camera ${this.cameraIndex} not available`);
+        if (videoDevices.length === 0) {
+            throw new Error('No camera devices found');
         }
+
+        // Pick the camera by index, fall back to first if index out of range
+        const targetDevice = videoDevices[this.cameraIndex] || videoDevices[0];
 
         this.stream = await navigator.mediaDevices.getUserMedia({
             video: {
-                deviceId: { exact: videoDevices[this.cameraIndex].deviceId },
-                width: { min: 640, ideal: 1280 },
-                height: { min: 480, ideal: 720 }
+                deviceId: { exact: targetDevice.deviceId },
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
             }
         });
 
         this.video.srcObject = this.stream;
-        await new Promise((resolve) => {
+        await new Promise((resolve, reject) => {
             this.video.onloadedmetadata = () => {
                 this.updateCanvasDimensions();
                 resolve();
             };
+            this.video.onerror = reject;
         });
     }
 
     setupEventListeners() {
         window.addEventListener('resize', () => this.updateCanvasDimensions());
-        this.toggleButton.addEventListener('click', () => this.toggleCamera());
+        // Use a named handler to avoid duplicate listeners on reconnect
+        if (!this._toggleBound) {
+            this._toggleBound = () => this.toggleCamera();
+            this.toggleButton.addEventListener('click', this._toggleBound);
+        }
     }
 
     startProcessing() {
@@ -281,11 +294,12 @@ class CameraSystem {
     async connectCamera() {
         try {
             await this.setupMediaStream();
+            this.setupEventListeners();
             this.startProcessing();
             this.updateButtonState('Disconnect', 'LIVE', 'status-live');
         } catch (error) {
             console.error(`Camera ${this.cameraIndex} connection failed:`, error);
-            this.handleCameraError();
+            this.handleCameraError(error);
         }
     }
 
@@ -304,16 +318,28 @@ class CameraSystem {
         this.statusIndicator.classList.add(statusClass);
     }
 
-    handleCameraError() {
-        console.error(`Camera ${this.cameraIndex} failed`);
-        if (this.canvas) {
-            this.canvas.style.backgroundColor = '#ff000020';
+    handleCameraError(error) {
+        console.error(`Camera ${this.cameraIndex} failed`, error);
+        this.isActive = false;
+
+        let statusText = 'ERROR';
+        let buttonText = 'Retry';
+
+        if (error && (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError')) {
+            statusText = 'NO PERMISSION';
+            buttonText = 'Retry';
+            console.warn('Camera permission denied. Please allow camera access in your browser.');
+        } else if (error && error.name === 'NotFoundError') {
+            statusText = 'NOT FOUND';
+            buttonText = 'Retry';
+        } else if (error && error.name === 'NotReadableError') {
+            statusText = 'IN USE';
+            buttonText = 'Retry';
         }
-        this.toggleButton.disabled = true;
-        this.toggleButton.textContent = 'Error';
-        this.statusIndicator.textContent = 'ERROR';
-        this.statusIndicator.className = 'status-indicator';
-        this.statusIndicator.classList.add('status-error');
+
+        this.updateButtonState(buttonText, statusText, 'status-error');
+        this.toggleButton.disabled = false;
+        this.toggleButton.onclick = () => this.connectCamera();
     }
 }
 
