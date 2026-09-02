@@ -1,11 +1,11 @@
 import os
 import threading
-from flask import Flask, request, jsonify, render_template, redirect, url_for, flash, send_from_directory
+from flask import Flask, request, jsonify, render_template, redirect, url_for, flash, send_from_directory, Response
 from flask_cors import CORS
 import numpy as np
 import base64
 from datetime import datetime
-from config import STATUS_COLORS
+from config import STATUS_COLORS, CAMERAS
 from utils import rgb_to_hex
 from database import (
     init_db,
@@ -73,6 +73,19 @@ if CLASSIFIER_AVAILABLE:
 
 # Thread-safe retraining
 retraining_lock = threading.Lock()
+
+# ---------------------------------------------------------------------------
+# RTSP Camera Manager
+# ---------------------------------------------------------------------------
+try:
+    from rtsp_camera import camera_manager
+    camera_manager.start()
+    RTSP_AVAILABLE = True
+    print("RTSP camera manager started")
+except Exception as e:
+    print(f"Warning: RTSP camera manager unavailable: {e}")
+    camera_manager = None
+    RTSP_AVAILABLE = False
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -358,7 +371,143 @@ def get_data():
 
     return jsonify(results)
 
-# //////////////////////////////////////////////////////
+# ======================================================
+# RTSP / Hikvision Camera Routes
+# ======================================================
+
+@app.route('/api/cameras/config')
+def cameras_config():
+    """
+    Return the camera configuration list so the front-end knows
+    which cameras are RTSP vs webcam and can render them correctly.
+    Strips credentials from the RTSP URL before sending.
+    """
+    import re
+    safe_cameras = []
+    for cam in CAMERAS:
+        c = dict(cam)
+        if 'rtsp_url' in c:
+            c['rtsp_url'] = re.sub(
+                r'(rtsp://[^:]+:)[^@]+(@)', r'\1***\2', c['rtsp_url']
+            )
+        safe_cameras.append(c)
+    return jsonify(safe_cameras)
+
+
+@app.route('/api/cameras/status')
+def cameras_status():
+    """
+    Returns live connection status for all RTSP cameras.
+    Response: [ { id, cam_id, name, connected, frame_count, enabled }, … ]
+    """
+    if not RTSP_AVAILABLE or camera_manager is None:
+        return jsonify({'error': 'RTSP not available'}), 503
+    return jsonify(camera_manager.get_status())
+
+
+@app.route('/api/cameras/stream/<int:cam_id>')
+def camera_stream(cam_id):
+    """
+    MJPEG streaming endpoint.
+    The browser (or <img> tag) connects here and receives a continuous
+    multipart/x-mixed-replace stream of annotated JPEG frames.
+
+    URL: /api/cameras/stream/0  (0-based camera id from CAMERAS config)
+    """
+    if not RTSP_AVAILABLE or camera_manager is None:
+        return jsonify({'error': 'RTSP not available'}), 503
+
+    cam = camera_manager.get_camera(cam_id)
+    if cam is None:
+        return jsonify({'error': f'Camera {cam_id} not found'}), 404
+
+    return Response(
+        camera_manager.mjpeg_generator(cam_id),
+        mimetype='multipart/x-mixed-replace; boundary=frame'
+    )
+
+
+@app.route('/api/cameras/<int:cam_id>/snapshot')
+def camera_snapshot(cam_id):
+    """
+    Returns a single JPEG snapshot from an RTSP camera.
+    Useful for thumbnails, connection testing, and the addpeople form.
+    """
+    if not RTSP_AVAILABLE or camera_manager is None:
+        return jsonify({'error': 'RTSP not available'}), 503
+
+    jpeg = camera_manager.get_jpeg(cam_id)
+    if jpeg is None:
+        return jsonify({'error': 'No frame available — camera may be offline'}), 503
+
+    return Response(jpeg, mimetype='image/jpeg')
+
+
+@app.route('/api/cameras/<int:cam_id>/detections')
+def camera_detections(cam_id):
+    """
+    Returns the latest AI detection results for a given RTSP camera.
+    The front-end can poll this to get bounding boxes without streaming.
+    """
+    if not RTSP_AVAILABLE or camera_manager is None:
+        return jsonify({'error': 'RTSP not available'}), 503
+
+    return jsonify(camera_manager.get_detections(cam_id))
+
+
+@app.route('/api/cameras/<int:cam_id>/start', methods=['POST'])
+def camera_start(cam_id):
+    """Start (or restart) a specific RTSP camera."""
+    if not RTSP_AVAILABLE or camera_manager is None:
+        return jsonify({'error': 'RTSP not available'}), 503
+
+    ok = camera_manager.start_camera(cam_id)
+    if ok:
+        return jsonify({'success': True, 'message': f'Camera {cam_id} starting'})
+    return jsonify({'success': False, 'error': f'Camera {cam_id} not found'}), 404
+
+
+@app.route('/api/cameras/<int:cam_id>/stop', methods=['POST'])
+def camera_stop(cam_id):
+    """Stop a specific RTSP camera stream."""
+    if not RTSP_AVAILABLE or camera_manager is None:
+        return jsonify({'error': 'RTSP not available'}), 503
+
+    ok = camera_manager.stop_camera(cam_id)
+    if ok:
+        return jsonify({'success': True, 'message': f'Camera {cam_id} stopped'})
+    return jsonify({'success': False, 'error': f'Camera {cam_id} not found'}), 404
+
+
+@app.route('/api/cameras/<int:cam_id>/configure', methods=['POST'])
+def camera_configure(cam_id):
+    """
+    Hot-update a camera's RTSP URL without restarting the whole app.
+    Body (JSON): { "rtsp_url": "rtsp://user:pass@192.168.1.x:554/..." }
+
+    This is the primary way to change camera IP addresses at runtime.
+    """
+    if not RTSP_AVAILABLE or camera_manager is None:
+        return jsonify({'error': 'RTSP not available'}), 503
+
+    data = request.get_json(force=True) or {}
+    rtsp_url = data.get('rtsp_url', '').strip()
+
+    if not rtsp_url.startswith('rtsp://'):
+        return jsonify({'error': 'Invalid RTSP URL — must start with rtsp://'}), 400
+
+    ok = camera_manager.update_camera_url(cam_id, rtsp_url)
+    if ok:
+        return jsonify({'success': True, 'message': f'Camera {cam_id} reconfigured'})
+    return jsonify({'success': False, 'error': f'Camera {cam_id} not found'}), 404
+
+
+# ======================================================
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    try:
+        app.run(host='0.0.0.0', port=5000, debug=True)
+    finally:
+        # Cleanly stop RTSP threads on exit
+        if camera_manager:
+            camera_manager.stop()

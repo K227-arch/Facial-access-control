@@ -76,18 +76,28 @@
     </section>
 
    <section class="cameras">
-        <!-- First Camera -->
-        <div class="cam-card">
+        <!-- Camera cards are rendered dynamically by main.js from /api/cameras/config -->
+        <!-- Fallback cards shown until JS loads -->
+        <div class="cam-card" data-cam-id="0">
             <div>
                 <div class="cam-header">
                     <i class="bi bi-camera"></i>
                     <h4>Area A - Main Entrance</h4>
                 </div>
-                <small>ID: CAM-01</small>
+                <small class="cam-id-label">ID: CAM-01</small>
             </div>
             <div class="video-container">
-                <video id="liveFeed" autoplay playsinline></video>
-                <canvas id="overlay"></canvas>
+                <!-- RTSP mode: <img> receives the MJPEG stream from the server -->
+                <img class="rtsp-feed" style="display:none; width:100%; height:100%; object-fit:cover;" alt="RTSP feed" />
+                <!-- Webcam mode: <video> receives getUserMedia stream -->
+                <video autoplay playsinline style="display:none;"></video>
+                <!-- Canvas overlays bounding boxes in webcam mode -->
+                <canvas class="cam-overlay"></canvas>
+                <!-- Offline placeholder -->
+                <div class="cam-offline-placeholder">
+                    <i class="bi bi-camera cam-icon"></i>
+                    <span>OFFLINE</span>
+                </div>
             </div>
             <div class="cam-status">
                 <small>STATUS: <span class="status-indicator status-offline">OFFLINE</span></small>
@@ -95,53 +105,72 @@
             </div>
         </div>
 
-        <!-- Second Camera -->
-        <div class="cam-card">
+        <div class="cam-card" data-cam-id="1">
             <div>
                 <div class="cam-header">
                     <i class="bi bi-camera"></i>
-                    <h4>Area B - External Webcam</h4>
+                    <h4>Area B - Side Entrance</h4>
                 </div>
-                <small>ID: CAM-02</small>
+                <small class="cam-id-label">ID: CAM-02</small>
             </div>
-            <div class="video-container-inactive">
-                <i class="bi bi-camera cam-icon"></i>
+            <div class="video-container">
+                <img class="rtsp-feed" style="display:none; width:100%; height:100%; object-fit:cover;" alt="RTSP feed" />
+                <video autoplay playsinline style="display:none;"></video>
+                <canvas class="cam-overlay"></canvas>
+                <div class="cam-offline-placeholder">
+                    <i class="bi bi-camera cam-icon"></i>
+                    <span>OFFLINE</span>
+                </div>
             </div>
             <div class="cam-status">
-                <small>STATUS: <span class="status-indicator">OFF</span></small>
-                <button class="toggle-camera" disabled>Disconnected</button>
+                <small>STATUS: <span class="status-indicator status-offline">OFFLINE</span></small>
+                <button class="toggle-camera">Connect</button>
             </div>
         </div>
-          <div class="cam-card">
+
+        <div class="cam-card" data-cam-id="2">
             <div>
                 <div class="cam-header">
                     <i class="bi bi-camera"></i>
-                    <h4>Area C - External Webcam</h4>
+                    <h4>Area C - Parking</h4>
                 </div>
-                <small>ID: CAM-03</small>
+                <small class="cam-id-label">ID: CAM-03</small>
             </div>
-             <div class="video-container-inactive">
-                 <i class="bi bi-camera cam-icon"></i>
+            <div class="video-container">
+                <img class="rtsp-feed" style="display:none; width:100%; height:100%; object-fit:cover;" alt="RTSP feed" />
+                <video autoplay playsinline style="display:none;"></video>
+                <canvas class="cam-overlay"></canvas>
+                <div class="cam-offline-placeholder">
+                    <i class="bi bi-camera cam-icon"></i>
+                    <span>OFFLINE</span>
+                </div>
             </div>
             <div class="cam-status">
-                <small>STATUS: <span class="status-indicator">OFF</span></small>
-                <button class="toggle-camera">Disconnected</button>
+                <small>STATUS: <span class="status-indicator status-offline">OFFLINE</span></small>
+                <button class="toggle-camera">Connect</button>
             </div>
         </div>
-          <div class="cam-card">
+
+        <div class="cam-card" data-cam-id="3">
             <div>
                 <div class="cam-header">
                     <i class="bi bi-camera"></i>
-                    <h4>Area D - External Webcam</h4>
+                    <h4>Area D - Back Exit</h4>
                 </div>
-                <small>ID: CAM-04</small>
+                <small class="cam-id-label">ID: CAM-04</small>
             </div>
-            <div class="video-container-inactive">
-                 <i class="bi bi-camera cam-icon"></i>
+            <div class="video-container">
+                <img class="rtsp-feed" style="display:none; width:100%; height:100%; object-fit:cover;" alt="RTSP feed" />
+                <video autoplay playsinline style="display:none;"></video>
+                <canvas class="cam-overlay"></canvas>
+                <div class="cam-offline-placeholder">
+                    <i class="bi bi-camera cam-icon"></i>
+                    <span>OFFLINE</span>
+                </div>
             </div>
             <div class="cam-status">
-                <small>STATUS: <span class="status-indicator">OFF</span></small>
-                <button class="toggle-camera">Disconnected</button>
+                <small>STATUS: <span class="status-indicator status-offline">OFFLINE</span></small>
+                <button class="toggle-camera">Connect</button>
             </div>
         </div>
     </section>
