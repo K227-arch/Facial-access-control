@@ -36,11 +36,9 @@ def hik_rtsp(ip, channel=101, user=None, password=None, port=None):
 CAMERAS = [
     {
         "id": 0,
-        "name": "Area A - Main Entrance",
+        "name": "Webcam — Local",
         "cam_id": "CAM-01",
-        "stream_type": "rtsp",                        # ← RTSP (Hikvision)
-        "rtsp_url": hik_rtsp("192.168.1.64"),         # ← set your camera IP
-        "channel": 101,                               # main stream
+        "stream_type": "webcam",   # ← browser getUserMedia → posts to /getdata/
         "enabled": True,
     },
     {
@@ -50,7 +48,7 @@ CAMERAS = [
         "stream_type": "rtsp",
         "rtsp_url": hik_rtsp("192.168.1.65"),
         "channel": 101,
-        "enabled": True,
+        "enabled": False,          # disable until RTSP cameras are on the LAN
     },
     {
         "id": 2,
@@ -59,7 +57,7 @@ CAMERAS = [
         "stream_type": "rtsp",
         "rtsp_url": hik_rtsp("192.168.1.66"),
         "channel": 101,
-        "enabled": True,
+        "enabled": False,
     },
     {
         "id": 3,
@@ -68,7 +66,7 @@ CAMERAS = [
         "stream_type": "rtsp",
         "rtsp_url": hik_rtsp("192.168.1.67"),
         "channel": 101,
-        "enabled": True,
+        "enabled": False,
     },
 ]
 
@@ -133,5 +131,8 @@ class Config:
     MAIL_SERVER = 'smtp.gmail.com'
     MAIL_PORT = 587
     MAIL_USE_TLS = True
-    MAIL_USERNAME = os.getenv('admin@gmail.com')      # e.g. your.email@gmail.com
-    MAIL_PASSWORD = os.getenv('admin123')      # your Gmail app password
+    # NOTE: os.getenv() takes the NAME of the env var, not its value.
+    # Previously this called os.getenv('admin@gmail.com') which always
+    # returned None (no env var literally named that).
+    MAIL_USERNAME = os.getenv('MAIL_USERNAME')   # e.g. your.email@gmail.com
+    MAIL_PASSWORD = os.getenv('MAIL_PASSWORD')    # your Gmail app password

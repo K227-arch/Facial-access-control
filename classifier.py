@@ -125,15 +125,27 @@ def retrain_model(analyzer):
     y_encoded = le.fit_transform(labels)
 
 
-    model = CatBoostClassifier(
-        iterations=1000,  # number of trees
-        learning_rate=0.01,  # how fast to learn
-        depth=6,  # depth of trees
-        verbose=True,  # set verbose>0 if you want training logs
-        task_type="GPU"
-
-    )
-    model.fit(embeddings, y_encoded)
+    # CatBoost training — try GPU first, fall back to CPU if unavailable.
+    # Previously this hardcoded task_type="GPU", which raised
+    # catboost.CatBoostError on any machine without a CUDA-capable GPU
+    # (the "Train Model" button on /addpeople would crash).
+    common_kwargs = dict(iterations=1000, learning_rate=0.01, depth=6)
+    try:
+        model = CatBoostClassifier(
+            task_type="GPU",
+            devices='0',
+            verbose=True,
+            **common_kwargs,
+        )
+        model.fit(embeddings, y_encoded)
+    except Exception as e:
+        logger.warning(f"GPU training failed ({e}); falling back to CPU")
+        model = CatBoostClassifier(
+            task_type="CPU",
+            verbose=True,
+            **common_kwargs,
+        )
+        model.fit(embeddings, y_encoded)
 
     # Save models
     with open('./Models/catboost_model.pkl', 'wb') as f:

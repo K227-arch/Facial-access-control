@@ -115,35 +115,132 @@ function drawBoxes(ctx, canvas, detections, refWidth, refHeight) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (!detections || !detections.length) return;
 
+    // Coordinate transform: source pixels → canvas buffer pixels.
+    // For webcam mode canvas.width === refWidth, so scaleX === 1.0.
     const scaleX = canvas.width  / (refWidth  || canvas.width);
     const scaleY = canvas.height / (refHeight || canvas.height);
+
+    // ── Display-aware sizing ──────────────────────────────────────────────
+    // The canvas buffer is native resolution (e.g. 1280×720) but it is
+    // displayed CSS-scaled down to the card width (e.g. ~450px).
+    // Using buffer coords directly gives tiny text/lines on screen.
+    // We compute a displayRatio = buffer / display so every px value we
+    // write is bumped up proportionally and looks right at screen size.
+    const displayW   = canvas.offsetWidth  || canvas.width;   // CSS display px
+    const displayH   = canvas.offsetHeight || canvas.height;
+    const displayRatioX = canvas.width  / displayW;   // e.g. 1280/450 ≈ 2.84
+    const displayRatioY = canvas.height / displayH;
+
+    // Target sizes in *screen* pixels, then scale up to buffer coords:
+    const SCREEN_FONT_PX  = 16;   // readable label text (screen px)
+    const SCREEN_LINE_PX  = 2.5;  // box stroke (screen px)
+    const SCREEN_PAD_PX   = 8;    // chip horizontal padding (screen px)
+    const SCREEN_VPAD_PX  = 6;    // chip vertical padding (screen px)
+    const SCREEN_CORNER   = 14;   // corner accent length (screen px)
+
+    const bufFontPx   = Math.round(SCREEN_FONT_PX  * displayRatioX);
+    const bufLineW    = Math.max(1.5, SCREEN_LINE_PX  * displayRatioX);
+    const bufPadH     = Math.round(SCREEN_PAD_PX   * displayRatioX);
+    const bufPadV     = Math.round(SCREEN_VPAD_PX  * displayRatioY);
+    const bufCorner   = Math.round(SCREEN_CORNER   * displayRatioX);
+    const bufRadius   = Math.round(5 * displayRatioX);   // chip corner radius
+
+    ctx.font      = `bold ${bufFontPx}px "Segoe UI", Arial, sans-serif`;
+    ctx.lineWidth = bufLineW;
 
     detections.forEach(det => {
         if (!det.bbox) return;
         const [x1, y1, x2, y2] = det.bbox;
-        const w = x2 - x1;
-        const h = y2 - y1;
+        const bx = x1 * scaleX;
+        const by = y1 * scaleY;
+        const bw = (x2 - x1) * scaleX;
+        const bh = (y2 - y1) * scaleY;
         const color = det.color || '#FF0000';
 
-        // Bounding box
+        // ── Bounding box ─────────────────────────────────────────────────
         ctx.strokeStyle = color;
-        ctx.lineWidth   = 2;
-        ctx.strokeRect(x1 * scaleX, y1 * scaleY, w * scaleX, h * scaleY);
+        ctx.lineWidth   = bufLineW;
+        ctx.strokeRect(bx, by, bw, bh);
 
-        // Label + background chip
-        const text = `${det.label || 'Processing...'} ${Math.round((det.confidence || 0) * 100)}%`;
-        ctx.font = '16px Arial';
-        const tw = ctx.measureText(text).width;
-        const th = 16;
-        const pad = 4;
-        const rx  = x1 * scaleX;
-        const ry  = Math.max(y1 * scaleY - th - pad * 2, 0);
+        // ── Corner accent marks ───────────────────────────────────────────
+        const cs = Math.min(bufCorner, bw * 0.25, bh * 0.25);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth   = bufLineW * 1.6;
+        ctx.lineCap     = 'round';
+        for (const [ox, oy, dx, dy] of [
+            [bx,      by,      1,  1],   // top-left
+            [bx + bw, by,     -1,  1],   // top-right
+            [bx,      by + bh, 1, -1],   // bottom-left
+            [bx + bw, by + bh,-1, -1],   // bottom-right
+        ]) {
+            ctx.beginPath();
+            ctx.moveTo(ox + dx * cs, oy);
+            ctx.lineTo(ox, oy);
+            ctx.lineTo(ox, oy + dy * cs);
+            ctx.stroke();
+        }
+        ctx.lineCap   = 'butt';
+        ctx.lineWidth = bufLineW;
 
+        // ── Label chip ────────────────────────────────────────────────────
+        const conf  = Math.round((det.confidence || 0) * 100);
+        const label = det.label || 'Unknown';
+        const status = (det.status || '').toLowerCase();
+
+        // Two-line chip: name on top, status + confidence below
+        const nameLine   = label;
+        const statusLine = `${status.toUpperCase()}  ${conf}%`;
+
+        ctx.font         = `bold ${bufFontPx}px "Segoe UI", Arial, sans-serif`;
+        const nameW      = ctx.measureText(nameLine).width;
+        ctx.font         = `${Math.round(bufFontPx * 0.82)}px "Segoe UI", Arial, sans-serif`;
+        const statusW    = ctx.measureText(statusLine).width;
+
+        const chipW  = Math.max(nameW, statusW) + bufPadH * 2;
+        const lineH  = bufFontPx + bufPadV;
+        const chipH  = lineH * 2 + bufPadV;
+
+        // Clamp chip so it never goes outside the canvas
+        const chipX = Math.min(bx, canvas.width  - chipW);
+        const chipY = by >= chipH + bufPadV
+            ? by - chipH - bufPadV          // above the box (preferred)
+            : by + bufPadV;                 // inside top of box (fallback)
+
+        // Semi-transparent dark base + colour left accent
+        ctx.globalAlpha = 0.88;
+        ctx.fillStyle = 'rgba(10, 14, 24, 0.92)';
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(chipX, chipY, chipW, chipH, bufRadius);
+        } else {
+            ctx.rect(chipX, chipY, chipW, chipH);
+        }
+        ctx.fill();
+
+        // Colour left stripe
+        ctx.globalAlpha = 1;
+        const stripeW = Math.max(3, Math.round(4 * displayRatioX));
         ctx.fillStyle = color;
-        ctx.fillRect(rx, ry, tw + pad * 2, th + pad * 2);
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(chipX, chipY, stripeW, chipH, [bufRadius, 0, 0, bufRadius]);
+        } else {
+            ctx.rect(chipX, chipY, stripeW, chipH);
+        }
+        ctx.fill();
 
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillText(text, rx + pad, ry + th + pad);
+        // Name line (large, white)
+        ctx.fillStyle    = '#ffffff';
+        ctx.textBaseline = 'middle';
+        ctx.font         = `bold ${bufFontPx}px "Segoe UI", Arial, sans-serif`;
+        ctx.fillText(nameLine,   chipX + stripeW + bufPadH, chipY + lineH * 0.5);
+
+        // Status + confidence line (smaller, coloured)
+        ctx.fillStyle = color;
+        ctx.font      = `${Math.round(bufFontPx * 0.82)}px "Segoe UI", Arial, sans-serif`;
+        ctx.fillText(statusLine, chipX + stripeW + bufPadH, chipY + lineH * 1.5);
+
+        ctx.globalAlpha = 1;
     });
 }
 
@@ -216,21 +313,22 @@ class BaseCameraSystem {
         const container = this.canvas.parentElement;
         if (!container) return;
 
-        const cw = container.clientWidth;
-        const ch = container.clientHeight;
-        if (!refWidth || !refHeight) {
-            this.canvas.width  = cw;
-            this.canvas.height = ch;
-            return;
+        // The canvas CSS is set to position:absolute width:100% height:100%
+        // so it already fills the container visually via CSS.
+        // We only need to set the *pixel buffer* size to match the source
+        // resolution so drawBoxes can map coordinates without scaling errors.
+        // Use the source dimensions directly when provided.
+        if (refWidth && refHeight) {
+            this.canvas.width  = refWidth;
+            this.canvas.height = refHeight;
+        } else {
+            // Fallback: match container display size
+            this.canvas.width  = container.clientWidth  || 640;
+            this.canvas.height = container.clientHeight || 360;
         }
-        const ratio = refWidth / refHeight;
-        let w, h;
-        if (cw / ch > ratio) { h = ch; w = h * ratio; }
-        else                  { w = cw; h = w / ratio; }
-        this.canvas.width          = w;
-        this.canvas.height         = h;
-        this.canvas.style.width    = `${w}px`;
-        this.canvas.style.height   = `${h}px`;
+        // Remove any inline width/height that would fight the CSS 100% rule
+        this.canvas.style.width  = '';
+        this.canvas.style.height = '';
     }
 
     // Subclasses must implement:
@@ -418,8 +516,8 @@ class WebcamCameraSystem extends BaseCameraSystem {
         try {
             await this._openStream();
             this.isActive = true;
+            // video was already made visible inside _openStream onloadedmetadata
             this.showPlaceholder(false);
-            if (this.videoEl) this.videoEl.style.display = 'block';
             this.setStatus('LIVE', 'status-live');
             this.setButton('Disconnect', false);
             this._startProcessing();
@@ -466,6 +564,9 @@ class WebcamCameraSystem extends BaseCameraSystem {
         this.videoEl.srcObject = this.stream;
         await new Promise((res, rej) => {
             this.videoEl.onloadedmetadata = () => {
+                // Make video visible first so the container has a real
+                // clientHeight, then size the canvas to the native resolution.
+                this.videoEl.style.display = 'block';
                 this.resizeCanvas(this.videoEl.videoWidth, this.videoEl.videoHeight);
                 res();
             };
@@ -494,11 +595,13 @@ class WebcamCameraSystem extends BaseCameraSystem {
             const frameData = this._captureFrame();
             const results   = await this._sendFrame(frameData);
             if (Array.isArray(results)) {
-                this.resizeCanvas(this.videoEl.videoWidth, this.videoEl.videoHeight);
-                drawBoxes(
-                    this.ctx, this.canvas, results,
-                    this.videoEl.videoWidth, this.videoEl.videoHeight
-                );
+                // Re-sync canvas buffer only when native video dimensions change
+                const vw = this.videoEl.videoWidth;
+                const vh = this.videoEl.videoHeight;
+                if (this.canvas.width !== vw || this.canvas.height !== vh) {
+                    this.resizeCanvas(vw, vh);
+                }
+                drawBoxes(this.ctx, this.canvas, results, vw, vh);
                 processDetectionResults(results, this.camId, this.camLabel);
             }
         } catch (e) {
@@ -575,8 +678,12 @@ async function initializeCameraSystems() {
         };
 
         if (!config.enabled) {
-            card.querySelector('.toggle-camera').textContent = 'Disabled';
-            card.querySelector('.toggle-camera').disabled    = true;
+            card.classList.add('cam-disabled');
+            const btn = card.querySelector('.toggle-camera');
+            if (btn) { btn.textContent = 'Disabled'; btn.disabled = true; }
+            // Show a static offline placeholder with "DISABLED" text
+            const ph = card.querySelector('.cam-offline-placeholder span');
+            if (ph) ph.textContent = 'DISABLED';
             return;
         }
 

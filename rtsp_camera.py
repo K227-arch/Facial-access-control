@@ -48,6 +48,13 @@ from utils import rgb_to_hex
 
 logger = logging.getLogger(__name__)
 
+# Minimum seconds between DB writes for the same (camera, label) pair.
+# Without this, a stationary person was logged ~5×/second per camera,
+# flooding FaceRecords with duplicate rows.
+SAVE_COOLDOWN_SECONDS = 30.0
+# How long to keep a per-label cooldown entry before pruning it.
+SAVE_COOLDOWN_PRUNE_SECONDS = 300.0
+
 # ---------------------------------------------------------------------------
 # Lazy imports — analyzer / classifier are initialised in app.py.
 # We grab them at runtime to avoid circular imports.
@@ -66,10 +73,10 @@ def _get_classifier():
     except Exception:
         return None
 
-def _save_record(label, conf, bbox, embedding, ts):
+def _save_record(label, conf, bbox, embedding, ts, status='recognized'):
     try:
         from database import save_face_record
-        save_face_record(label, float(conf), bbox, embedding, ts)
+        save_face_record(label, float(conf), bbox, embedding, ts, status)
     except Exception as e:
         logger.warning(f"DB save failed: {e}")
 
@@ -115,6 +122,11 @@ class RTSPCamera:
         # Latest AI detections list
         self._detections      = []
         self._detections_lock = threading.Lock()
+
+        # Per-label cooldown so we don't log the same recognized person
+        # every inference tick. Map: label -> monotonic seconds of last save.
+        self._last_save_ts: dict[str, float] = {}
+        self._save_lock = threading.Lock()
 
         # Timestamps
         self._last_frame_time     = 0.0
@@ -309,17 +321,33 @@ class RTSPCamera:
                     if classifier:
                         try:
                             status, label, conf = classifier.classify(face.embedding)
-                            if status == 'recognized':
-                                _save_record(
-                                    label, conf,
-                                    [x1, y1, x2, y2],
-                                    face.embedding, ts
-                                )
                         except Exception as ce:
                             logger.debug(f"[{self.cam_id}] Classify err: {ce}")
                             status, label, conf = 'unknown', 'Unknown', 0.0
                     else:
                         status, label, conf = 'unknown', 'No Classifier', 0.0
+
+                    # Deduplicate: one record per (camera, label) per cooldown
+                    # window, regardless of status. This prevents DB flooding
+                    # when a face stays in frame across many inference ticks.
+                    # For 'unknown' faces the label is 'Unknown', so at most
+                    # one unknown record is logged per camera per cooldown.
+                    now_s = time.time()
+                    with self._save_lock:
+                        last = self._last_save_ts.get(label, 0.0)
+                        should_save = (now_s - last) >= SAVE_COOLDOWN_SECONDS
+                        if should_save:
+                            self._last_save_ts[label] = now_s
+                            # Prune stale entries to keep the dict bounded
+                            for k in list(self._last_save_ts):
+                                if now_s - self._last_save_ts[k] > SAVE_COOLDOWN_PRUNE_SECONDS:
+                                    del self._last_save_ts[k]
+                    if should_save:
+                        _save_record(
+                            label, conf,
+                            [x1, y1, x2, y2],
+                            face.embedding, ts, status
+                        )
 
                     results.append({
                         'bbox':       [x1, y1, x2, y2],

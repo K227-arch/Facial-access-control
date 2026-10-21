@@ -49,7 +49,15 @@ def init_db():
     conn.close()
 
 
-def save_face_record(name, confidence, bbox, embedding, timestamp=None):
+def save_face_record(name, confidence, bbox, embedding, timestamp=None, status='recognized'):
+    """Persist a face detection record.
+
+    status is the actual detection outcome ('recognized', 'unknown', or
+    'processing').  Previously this was hardcoded to 'recognized', which
+    meant unknown/processing faces were never reflected in KPIs or the
+    records page filters.  Callers that omit status keep the old default
+    for backward compatibility.
+    """
     timestamp = timestamp or datetime.now().isoformat(sep=' ', timespec='seconds')
     conn = get_db_connection()
     cur = conn.cursor()
@@ -63,9 +71,9 @@ def save_face_record(name, confidence, bbox, embedding, timestamp=None):
             name,
             confidence,
             timestamp,
-            'recognized',
+            status,
             str(bbox),
-            embedding.tobytes()
+            embedding.tobytes() if embedding is not None else None
         )
     )
     conn.commit()
@@ -121,11 +129,31 @@ def get_kpi_counts(records):
 
 
 def get_peak_hours(time_range='all'):
+    """Return the top-4 busiest hours, honouring the same time_range
+    that get_records uses.  Previously this always aggregated all rows
+    regardless of the range parameter."""
     conn = get_db_connection()
     cur = conn.cursor()
+
+    # Build the same WHERE clause used by get_records
+    where = ""
+    params = []
+    now = datetime.now()
+    if time_range == 'today':
+        where = "WHERE Timestamp LIKE ?"
+        params.append(now.strftime('%Y-%m-%d') + '%')
+    elif time_range == 'week':
+        start_week = (now - timedelta(days=now.weekday())).strftime('%Y-%m-%d')
+        where = "WHERE Timestamp >= ?"
+        params.append(f"{start_week} 00:00:00")
+    elif time_range == 'month':
+        where = "WHERE Timestamp LIKE ?"
+        params.append(now.strftime('%Y-%m') + '%')
+
     cur.execute(
-        "SELECT substr(Timestamp,12,2) AS hour, COUNT(*) AS cnt "
-        "FROM FaceRecords GROUP BY hour ORDER BY cnt DESC LIMIT 4"
+        f"SELECT substr(Timestamp,12,2) AS hour, COUNT(*) AS cnt "
+        f"FROM FaceRecords {where} GROUP BY hour ORDER BY cnt DESC LIMIT 4",
+        params
     )
     peaks = [{'hour': f"{row['hour']}:00", 'count': row['cnt']} for row in cur.fetchall()]
     conn.close()

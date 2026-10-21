@@ -172,7 +172,7 @@
                                 </div>
                                 <div class="match-score">
                                 <span class="label">Match Score</span>
-                                <span class="score">{{ record.Confidence * 100}}%</span>
+                                <span class="score">{{ (record.Confidence * 100) | round(0) | int }}%</span>
                                 </div>
                             </div>
 

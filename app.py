@@ -1,13 +1,20 @@
 import os
+import time
+import secrets
 import threading
 from flask import Flask, request, jsonify, render_template, redirect, url_for, flash, send_from_directory, Response
 from flask_cors import CORS
 import numpy as np
 import base64
 from datetime import datetime
+from dotenv import load_dotenv
+load_dotenv('.env.local', override=False)  # load InsForge DSN before anything else
+
 from config import STATUS_COLORS, CAMERAS
 from utils import rgb_to_hex
-from database import (
+# insforge_db is a drop-in replacement for database.py backed by InsForge Postgres.
+# The public API is identical so every call site below is unchanged.
+from insforge_db import (
     init_db,
     save_face_record,
     get_records,
@@ -43,9 +50,26 @@ MIN_IMAGES_REQUIRED = 10
 tracked_faces = {}
 next_face_id = 0
 
+# Dedup state for the webcam (/getdata/) path so the same person isn't logged
+# every frame. The RTSP path keeps its own per-camera dedup inside
+# RTSPCamera._last_save_ts.
+WEBCAM_SAVE_COOLDOWN_SECONDS = 30.0
+_webcam_last_save_ts: dict = {}
+
 
 app = Flask(__name__)
-app.secret_key = os.getenv('FLASK_SECRET', 'a-very-secret-key')
+
+# Session secret: use FLASK_SECRET from the environment if set, otherwise
+# generate a random ephemeral one so we never rely on a committed default.
+# Sessions won't survive restarts without an explicit secret — the correct
+# dev tradeoff. In production, always set FLASK_SECRET.
+_flask_secret = os.getenv('FLASK_SECRET')
+if _flask_secret:
+    app.secret_key = _flask_secret
+else:
+    app.secret_key = secrets.token_hex(32)
+    print("WARNING: FLASK_SECRET not set — using a random ephemeral secret. "
+          "Sessions will not persist across restarts. Set FLASK_SECRET in production.")
 CORS(app)
 
 # Initialize database and models
@@ -283,17 +307,37 @@ def calendar_page():
 
 @app.route('/api/search')
 def search_records():
-    """API endpoint for searching face records"""
-    query = request.args.get('q', '').strip()
-    date_from = request.args.get('from', '')
-    date_to = request.args.get('to', '')
-    
-    # Basic search implementation
+    """API endpoint for searching face records.
+    Params:
+        q       - name substring (case-insensitive)
+        from    - start date  YYYY-MM-DD  (inclusive)
+        to      - end date    YYYY-MM-DD  (inclusive)
+        status  - recognized | unknown | processing
+    Previously only q was applied; from/to/status were silently ignored.
+    """
+    query     = request.args.get('q', '').strip()
+    date_from = request.args.get('from', '').strip()
+    date_to   = request.args.get('to', '').strip()
+    status    = request.args.get('status', '').strip()
+
+    # Pull all records then filter in Python so we reuse get_records'
+    # existing time-window logic for the range tabs; for the search page
+    # we always start from 'all' and let the explicit params narrow it.
     records = get_records('all')
-    
+
     if query:
         records = [r for r in records if query.lower() in r['Name'].lower()]
-    
+
+    if date_from:
+        records = [r for r in records if r['Timestamp'] >= date_from]
+
+    if date_to:
+        # include the whole day: compare against date + ' 23:59:59'
+        records = [r for r in records if r['Timestamp'] <= date_to + ' 23:59:59']
+
+    if status:
+        records = [r for r in records if r['Status'].lower() == status.lower()]
+
     return jsonify(records)
 
 
@@ -347,13 +391,27 @@ def get_data():
             if classifier:
                 try:
                     status, label, conf = classifier.classify(face.embedding)
-                    if status == 'recognized':
-                        save_face_record(label, float(conf), [x1, y1, x2, y2], face.embedding, timestamp)
                 except Exception as e:
                     print(f"Classification error: {e}")
                     status, label, conf = 'unknown', 'Unknown', 0.0
             else:
                 status, label, conf = 'unknown', 'No Classifier', 0.0
+
+            # Dedup: only write to DB once per label per cooldown window.
+            # Previously this only saved 'recognized' faces, meaning unknown
+            # faces never appeared in records or KPIs.
+            now_s = time.time()
+            last = _webcam_last_save_ts.get(label, 0.0)
+            if now_s - last >= WEBCAM_SAVE_COOLDOWN_SECONDS:
+                save_face_record(
+                    label, float(conf), [x1, y1, x2, y2],
+                    face.embedding, timestamp, status
+                )
+                _webcam_last_save_ts[label] = now_s
+                # Prune stale entries
+                for k in list(_webcam_last_save_ts):
+                    if now_s - _webcam_last_save_ts[k] > 300:
+                        del _webcam_last_save_ts[k]
             
             results.append({
                 'bbox': [x1, y1, x2, y2],
@@ -505,8 +563,14 @@ def camera_configure(cam_id):
 # ======================================================
 
 if __name__ == '__main__':
+    # use_reloader=False: the Werkzeug reloader spawns a child process, which
+    # would re-run module-level startup (FaceAnalyzer, FaceClassifier,
+    # camera_manager.start()) a second time, leaking the parent's RTSP
+    # reader/inference threads and opening duplicate camera sockets.
+    # Debug mode is still available for error pages; just no auto-reload.
+    debug_mode = os.getenv('FLASK_DEBUG', '1').lower() in ('1', 'true', 'yes')
     try:
-        app.run(host='0.0.0.0', port=5000, debug=True)
+        app.run(host='0.0.0.0', port=5000, debug=debug_mode, use_reloader=False)
     finally:
         # Cleanly stop RTSP threads on exit
         if camera_manager:

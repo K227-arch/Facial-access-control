@@ -1,3 +1,4 @@
+
 /FaceRecognitionModels/
 
 # Trained model files (too large for Git)
@@ -8,3 +9,43 @@ Models/*.pkl
 instance/*.db
 *.db
 /FaceRecon/facereconenv/
+
+# Python cache — never commit
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv*/
+env/
+.venv/
+Lib/
+Scripts/
+Include/
+pyvenv.cfg
+
+# Training artifacts
+catboost_info/
+embeddings.npy
+labels.npy
+
+# InsForge & AI agent skills
+.insforge/
+.agent
+.agents
+.augment
+.claude
+.cline
+.github/copilot*
+.kilocode
+.qoder
+.qwen
+.roo
+.trae
+.windsurf
+
+# Local environment — contains InsForge keys, never commit
+.env.local
+.env*.local

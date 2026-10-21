@@ -86,40 +86,64 @@
     </main>
     <script>
 
-    let count = 0;
     const rowsPerPage = 12;
     let currentPage = 1;
-    const icidentList = document.getElementById('incident-list') 
+    const icidentList = document.getElementById('incident-list');
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
     const pageInfo = document.getElementById('pageInfo');
-    const filteredRows = Array.from(icidentList.querySelectorAll('.incident-card'));
-    console.log(filteredRows.length);
+    const searchInput = document.getElementById('searchInput');
+    // Master list of all incident cards rendered server-side.
+    const allRows = Array.from(icidentList.querySelectorAll('.incident-card'));
+    // Working list after the current search filter is applied.
+    let filteredRows = allRows.slice();
 
+    function rowMatches(row, q) {
+        if (!q) return true;
+        const name = (row.querySelector('strong')?.textContent || '').toLowerCase();
+        const desc = (row.querySelector('.incident-description')?.textContent || '').toLowerCase();
+        return name.includes(q) || desc.includes(q);
+    }
+
+    function applySearch() {
+        const q = (searchInput?.value || '').trim().toLowerCase();
+        filteredRows = allRows.filter(r => rowMatches(r, q));
+        currentPage = 1;
+        renderPage(currentPage);
+    }
 
     function updatePagination() {
         const totalPages = Math.max(1, Math.ceil(filteredRows.length / rowsPerPage));
         pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
         prevBtn.disabled = currentPage === 1;
-        nextBtn.disabled = currentPage === totalPages;
+        nextBtn.disabled = currentPage === totalPages || totalPages === 0;
     }
 
     function renderPage(page) {
         const start = (page - 1) * rowsPerPage;
         const end = start + rowsPerPage;
-        filteredRows.forEach(r => (r.style.display = 'none'));
+        // Hide everything first, then show only the current page of the
+        // filtered subset.
+        allRows.forEach(r => (r.style.display = 'none'));
         filteredRows.slice(start, end).forEach(r => (r.style.display = ''));
         updatePagination();
     }
 
+    // INITIAL RENDER
     renderPage(currentPage);
 
-     // Prev / Next
+    // Search input — previously this element had no listener attached.
+    if (searchInput) {
+        searchInput.addEventListener('input', applySearch);
+    }
+
+    // Prev / Next
     prevBtn.addEventListener('click', () => {
         if (currentPage > 1) renderPage(--currentPage);
     });
     nextBtn.addEventListener('click', () => {
-        renderPage(++currentPage);
+        const totalPages = Math.max(1, Math.ceil(filteredRows.length / rowsPerPage));
+        if (currentPage < totalPages) renderPage(++currentPage);
     });
 
     </script>
