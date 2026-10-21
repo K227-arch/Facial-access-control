@@ -1,0 +1,494 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   plates.css — Number Plate Detection dedicated page
+   Uses the same CSS variables as main.css.
+   Amber (#f5a623 / --neutral) is the ANPR accent colour throughout.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Page title icon ── */
+.plate-title-icon {
+  color: var(--neutral);
+  margin-right: 8px;
+  text-shadow: 0 0 8px rgba(245,166,35,0.5);
+}
+
+/* ── Stats cards ── */
+.plate-stats { padding-bottom: 0; }
+
+.anpr-stat-card {
+  border-color: rgba(245, 166, 35, 0.45) !important;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5), 0 0 8px rgba(245,166,35,0.2) !important;
+}
+.anpr-stat-card i   { color: var(--neutral) !important; }
+.anpr-stat-card h4  { color: var(--neutral) !important; }
+.anpr-stat-card .stat-number { color: var(--neutral); }
+
+.plate-cam-status-badge {
+  font-size: 1.1rem !important;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+/* ── Main two-column layout ── */
+.plate-main-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 20px;
+  padding: 16px 20px 20px;
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .plate-main-grid { grid-template-columns: 1fr; }
+}
+
+/* ══════════════════════════════════════════════
+   LEFT COLUMN — Camera feed
+   ══════════════════════════════════════════════ */
+
+.plate-feed-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Camera card ── */
+.plate-cam-card {
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  border: 1px solid rgba(245,166,35,0.4);
+  box-shadow: 0 0 12px rgba(0,0,0,0.5), 0 0 10px rgba(245,166,35,0.15);
+  overflow: hidden;
+}
+
+.plate-cam-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-bottom: 1px solid rgba(245,166,35,0.25);
+}
+
+.plate-cam-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--neutral);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.plate-cam-title i { font-size: 1rem; }
+
+.anpr-badge {
+  background: rgba(245,166,35,0.15);
+  border: 1px solid rgba(245,166,35,0.55);
+  color: var(--neutral);
+  font-size: 0.65rem;
+  font-weight: bold;
+  letter-spacing: 2px;
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+
+/* ── Video wrapper ── */
+.plate-video-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  overflow: hidden;
+}
+
+#plateVideo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: none;   /* shown by JS when stream is live */
+}
+
+#plateCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Offline overlay */
+.plate-offline-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(14, 18, 28, 0.92);
+  z-index: 3;
+  color: var(--text-muted);
+}
+
+.plate-offline-overlay i {
+  font-size: 3rem;
+  color: var(--neutral);
+  opacity: 0.5;
+}
+
+.plate-offline-overlay p  { font-size: 1rem; }
+.plate-offline-overlay small { font-size: 0.78rem; opacity: 0.7; }
+
+/* Scan-line animation */
+.plate-scan-line {
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(to right, transparent, var(--neutral), transparent);
+  box-shadow: 0 0 8px var(--neutral);
+  opacity: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.plate-scan-line.scanning {
+  opacity: 1;
+  animation: plateScan 2s linear infinite;
+}
+
+@keyframes plateScan {
+  0%   { top: 0%; }
+  100% { top: 100%; }
+}
+
+/* ── Camera footer ── */
+.plate-cam-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-top: 1px solid rgba(245,166,35,0.2);
+}
+
+.plate-cam-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.plate-cam-meta i { margin-right: 4px; color: var(--neutral); }
+
+.plate-cam-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-plate-connect {
+  background: rgba(245,166,35,0.12);
+  border: 1.5px solid rgba(245,166,35,0.55);
+  color: var(--neutral);
+  padding: 6px 14px;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.2s, transform 0.15s;
+}
+.btn-plate-connect:hover  { background: rgba(245,166,35,0.22); transform: translateY(-1px); }
+.btn-plate-connect.active { background: rgba(244,67,54,0.15); border-color: var(--negative); color: var(--negative); }
+
+.btn-plate-snap {
+  background: rgba(45,183,245,0.1);
+  border: 1.5px solid rgba(45,183,245,0.4);
+  color: var(--blue);
+  padding: 6px 12px;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-size: 0.82rem;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.2s;
+}
+.btn-plate-snap:hover:not(:disabled) { background: rgba(45,183,245,0.2); }
+.btn-plate-snap:disabled { opacity: 0.35; cursor: not-allowed; }
+
+/* ── Last detected plate highlight ── */
+.last-plate-card {
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  border: 1px solid rgba(245,166,35,0.4);
+  box-shadow: 0 0 12px rgba(0,0,0,0.4), 0 0 8px rgba(245,166,35,0.2);
+  padding: 16px 20px;
+  text-align: center;
+  animation: glowIn 0.4s ease-out;
+}
+
+@keyframes glowIn {
+  from { box-shadow: 0 0 24px rgba(245,166,35,0.6), 0 0 40px rgba(245,166,35,0.3); }
+  to   { box-shadow: 0 0 12px rgba(0,0,0,0.4), 0 0 8px rgba(245,166,35,0.2); }
+}
+
+.last-plate-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 6px;
+}
+
+.last-plate-value {
+  font-family: 'Courier New', monospace;
+  font-size: 2.2rem;
+  font-weight: bold;
+  color: var(--neutral);
+  letter-spacing: 4px;
+  text-shadow: 0 0 12px rgba(245,166,35,0.5);
+}
+
+.last-plate-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* ══════════════════════════════════════════════
+   RIGHT COLUMN — Log + History
+   ══════════════════════════════════════════════ */
+
+.plate-log-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Log card ── */
+.plate-log-card,
+.plate-history-card {
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  border: 1px solid rgba(245,166,35,0.3);
+  box-shadow: 0 0 10px rgba(0,0,0,0.4), 0 0 6px rgba(245,166,35,0.1);
+  overflow: hidden;
+}
+
+.plate-log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(245,166,35,0.2);
+  flex-shrink: 0;
+}
+
+.plate-log-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--neutral);
+  font-size: 0.9rem;
+}
+
+.btn-clear-plates {
+  background: transparent;
+  border: 1px solid rgba(245,166,35,0.35);
+  color: var(--text-muted);
+  font-size: 0.73rem;
+  padding: 3px 9px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+.btn-clear-plates:hover { border-color: var(--negative); color: var(--negative); }
+
+.plate-log-body {
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  scrollbar-width: thin;
+  scrollbar-color: #555 #0e141b;
+}
+.plate-log-body::-webkit-scrollbar { width: 5px; }
+.plate-log-body::-webkit-scrollbar-track { background: #0e141b; }
+.plate-log-body::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+
+/* ── Log item ── */
+.plate-log-item {
+  background: rgba(245,166,35,0.06);
+  border: 1px solid rgba(245,166,35,0.2);
+  border-radius: 6px;
+  padding: 9px 13px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  animation: plateSlideIn 0.22s ease-out;
+  transition: background 0.15s, transform 0.15s;
+}
+
+@keyframes plateSlideIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.plate-log-item:hover {
+  background: rgba(245,166,35,0.12);
+  transform: translateX(2px);
+}
+
+.plate-log-icon {
+  font-size: 1.2rem;
+  color: var(--neutral);
+  flex-shrink: 0;
+}
+
+.plate-log-body-text { flex: 1; min-width: 0; }
+
+.plate-log-text {
+  font-family: 'Courier New', monospace;
+  font-size: 1rem;
+  font-weight: bold;
+  color: var(--text-light);
+  letter-spacing: 2px;
+}
+
+.plate-log-meta {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.plate-log-conf {
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: var(--neutral);
+  background: rgba(245,166,35,0.12);
+  padding: 2px 7px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+/* ── Empty state ── */
+.plate-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 28px 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.plate-empty-state i     { font-size: 1.8rem; color: var(--neutral); opacity: 0.35; }
+.plate-empty-state p     { font-size: 0.85rem; }
+.plate-empty-state small { font-size: 0.72rem; opacity: 0.65; }
+
+/* ── History table ── */
+.plate-history-filters { display: flex; gap: 8px; align-items: center; }
+
+.plate-range-select {
+  background: rgba(45,183,245,0.08);
+  border: 1px solid rgba(45,183,245,0.35);
+  color: var(--text-light);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.plate-history-body {
+  overflow-x: auto;
+  max-height: 280px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #555 #0e141b;
+}
+.plate-history-body::-webkit-scrollbar { width: 5px; height: 5px; }
+.plate-history-body::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+
+.plate-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.plate-table thead tr {
+  background: rgba(245,166,35,0.07);
+  border-bottom: 1px solid rgba(245,166,35,0.25);
+}
+
+.plate-table th {
+  padding: 9px 12px;
+  color: var(--neutral);
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.plate-table th i { margin-right: 4px; font-size: 0.78rem; }
+
+.plate-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  color: var(--text-light);
+  vertical-align: middle;
+}
+
+.plate-table tbody tr:hover td {
+  background: rgba(245,166,35,0.05);
+}
+
+.plate-table .plate-cell {
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  letter-spacing: 1.5px;
+  color: var(--neutral);
+}
+
+.plate-table .conf-cell {
+  color: var(--positive);
+  font-weight: 600;
+}
+
+.table-empty-row td {
+  text-align: center;
+  padding: 20px;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.plate-history-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-top: 1px solid rgba(245,166,35,0.15);
+}
+
+.plate-history-footer small { color: var(--text-muted); font-size: 0.75rem; }
+
+.btn-refresh-history {
+  background: transparent;
+  border: 1px solid rgba(45,183,245,0.35);
+  color: var(--blue);
+  font-size: 0.73rem;
+  padding: 3px 9px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: background 0.2s;
+}
+.btn-refresh-history:hover { background: rgba(45,183,245,0.1); }

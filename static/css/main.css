@@ -694,3 +694,261 @@ body {
 
 /*Missc*/
 
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ANPR — Number Plate Detection Section
+   Completely separate from .cameras / .recent-detections face recognition UI.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ANPR stats card accent */
+.anpr-stat-card {
+  border-color: rgba(245, 166, 35, 0.5) !important;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5), 0 0 8px rgba(245,166,35,0.3) !important;
+}
+.anpr-stat-card i { color: var(--neutral) !important; }
+.anpr-stat-card h4 { color: var(--neutral) !important; }
+
+/* ── Section wrapper ── */
+.anpr-section {
+  padding: 0 20px 10px;
+}
+
+.anpr-section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0 10px;
+  border-bottom: 1px solid rgba(245, 166, 35, 0.3);
+  margin-bottom: 16px;
+}
+
+.anpr-section-header > i {
+  font-size: 1.6rem;
+  color: var(--neutral);
+  text-shadow: 0 0 8px var(--neutral);
+}
+
+.anpr-section-header h2 {
+  font-size: 1.2rem;
+  color: var(--neutral);
+  text-shadow: 0 0 6px rgba(245,166,35,0.4);
+  margin-bottom: 2px;
+}
+
+.anpr-section-header .subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.anpr-badge {
+  margin-left: auto;
+  background: rgba(245, 166, 35, 0.15);
+  border: 1px solid rgba(245, 166, 35, 0.6);
+  color: var(--neutral);
+  font-size: 0.7rem;
+  font-weight: bold;
+  letter-spacing: 2px;
+  padding: 3px 10px;
+  border-radius: 4px;
+}
+
+/* ── Camera + log panel layout ── */
+.anpr-cameras {
+  display: grid;
+  grid-template-columns: minmax(400px, 1.2fr) 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .anpr-cameras { grid-template-columns: 1fr; }
+}
+
+/* ANPR cam card — amber accent instead of blue */
+.anpr-cam-card {
+  border-color: rgba(245, 166, 35, 0.45) !important;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5), 0 0 8px rgba(245,166,35,0.2) !important;
+}
+
+.anpr-cam-card > *:first-child {
+  border-bottom-color: rgba(245, 166, 35, 0.3) !important;
+}
+
+.anpr-cam-card .cam-status {
+  border-top-color: rgba(245, 166, 35, 0.3) !important;
+  color: var(--neutral) !important;
+  text-shadow: 0 0 4px rgba(245,166,35,0.5) !important;
+}
+
+.anpr-cam-card .toggle-camera {
+  border-color: rgba(245, 166, 35, 0.5) !important;
+  color: var(--neutral) !important;
+}
+
+.anpr-cam-card .toggle-camera:hover {
+  background: rgba(245,166,35,0.1);
+}
+
+/* ── Live plate log panel ── */
+.anpr-log-panel {
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  border: 1px solid rgba(245, 166, 35, 0.35);
+  box-shadow: 0 0 10px rgba(0,0,0,0.5), 0 0 8px rgba(245,166,35,0.15);
+  display: flex;
+  flex-direction: column;
+  max-height: 420px;
+  overflow: hidden;
+}
+
+.anpr-log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(245, 166, 35, 0.3);
+  flex-shrink: 0;
+}
+
+.anpr-log-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--neutral);
+  font-size: 0.95rem;
+}
+
+.btn-clear-plates {
+  background: transparent;
+  border: 1px solid rgba(245,166,35,0.4);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  padding: 3px 9px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+
+.btn-clear-plates:hover {
+  border-color: var(--negative);
+  color: var(--negative);
+}
+
+#plateLogContainer {
+  overflow-y: auto;
+  flex: 1;
+  padding: 10px 12px;
+  scrollbar-width: thin;
+  scrollbar-color: #666 #0e141b;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#plateLogContainer::-webkit-scrollbar { width: 6px; }
+#plateLogContainer::-webkit-scrollbar-track { background: #0e141b; }
+#plateLogContainer::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+
+/* ── Plate log item ── */
+.plate-item {
+  background: rgba(245, 166, 35, 0.06);
+  border: 1px solid rgba(245, 166, 35, 0.25);
+  border-radius: 6px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: transform 0.15s, background 0.15s;
+  animation: plateSlideIn 0.25s ease-out;
+}
+
+@keyframes plateSlideIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.plate-item:hover {
+  background: rgba(245,166,35,0.12);
+  transform: translateX(2px);
+}
+
+.plate-item-icon {
+  font-size: 1.3rem;
+  color: var(--neutral);
+  text-shadow: 0 0 6px rgba(245,166,35,0.5);
+  flex-shrink: 0;
+}
+
+.plate-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.plate-text {
+  font-family: 'Courier New', monospace;
+  font-size: 1.05rem;
+  font-weight: bold;
+  color: var(--text-light);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.plate-meta {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.plate-conf {
+  font-size: 0.78rem;
+  font-weight: bold;
+  color: var(--neutral);
+  background: rgba(245,166,35,0.12);
+  padding: 2px 7px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+/* ── Empty state ── */
+.anpr-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 32px 16px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.anpr-empty-state i {
+  font-size: 2rem;
+  opacity: 0.4;
+  color: var(--neutral);
+}
+
+.anpr-empty-state p {
+  font-size: 0.9rem;
+}
+
+.anpr-empty-state small {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+/* ── Divider between face cameras and ANPR section ── */
+.section-divider {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(45,183,245,0.3) 20%,
+    rgba(45,183,245,0.3) 80%,
+    transparent
+  );
+  margin: 8px 20px 0;
+}

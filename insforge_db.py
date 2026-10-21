@@ -301,3 +301,87 @@ def get_all_incidents():
         }
         for row in rows
     ]
+
+
+# ── Plate Records ─────────────────────────────────────────────────────────────
+
+def save_plate_record(plate_text, confidence, bbox, timestamp=None,
+                      status='detected', camera_id=None):
+    """Insert one number-plate detection record.
+
+    Kept fully separate from face records — different table, different
+    call sites, no shared state.
+    """
+    ts = timestamp or datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    with _db() as cur:
+        cur.execute(
+            """
+            INSERT INTO plate_records
+                (plate_text, confidence, timestamp, status, bounding_box, camera_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (plate_text.upper(), float(confidence), ts,
+             status, str(bbox), camera_id)
+        )
+    logger.debug("Saved plate record: %s  conf=%.2f", plate_text, confidence)
+
+
+def get_plate_records(time_range='all', limit=500):
+    """Return plate records filtered by time range, newest first."""
+    base = "SELECT plate_text, confidence, bounding_box, status, timestamp, camera_id FROM plate_records"
+    params: list = []
+    now = datetime.now()
+
+    if time_range == 'today':
+        base += " WHERE timestamp LIKE %s"
+        params.append(now.strftime('%Y-%m-%d') + '%')
+    elif time_range == 'week':
+        start_week = (now - timedelta(days=now.weekday())).strftime('%Y-%m-%d')
+        base += " WHERE timestamp >= %s"
+        params.append(f"{start_week} 00:00:00")
+    elif time_range == 'month':
+        base += " WHERE timestamp LIKE %s"
+        params.append(now.strftime('%Y-%m') + '%')
+
+    base += " ORDER BY timestamp DESC LIMIT %s"
+    params.append(limit)
+
+    with _db() as cur:
+        cur.execute(base, params)
+        rows = cur.fetchall()
+
+    return [
+        {
+            'PlateText':   row['plate_text'],
+            'Confidence':  round(row['confidence'] or 0.0, 2),
+            'BoundingBox': row['bounding_box'],
+            'Status':      row['status'] or 'detected',
+            'Timestamp':   row['timestamp'] or '',
+            'CameraID':    row['camera_id'] or '',
+        }
+        for row in rows
+    ]
+
+
+def get_plate_kpi_counts(time_range='all'):
+    """Return today/week/month plate detection counts for the stats card."""
+    base = "SELECT COUNT(*) AS cnt FROM plate_records"
+    params: list = []
+    now = datetime.now()
+
+    if time_range == 'today':
+        base += " WHERE timestamp LIKE %s"
+        params.append(now.strftime('%Y-%m-%d') + '%')
+    elif time_range == 'week':
+        start_week = (now - timedelta(days=now.weekday())).strftime('%Y-%m-%d')
+        base += " WHERE timestamp >= %s"
+        params.append(f"{start_week} 00:00:00")
+    elif time_range == 'month':
+        base += " WHERE timestamp LIKE %s"
+        params.append(now.strftime('%Y-%m') + '%')
+
+    with _db() as cur:
+        cur.execute(base, params)
+        row = cur.fetchone()
+
+    return int(row['cnt']) if row else 0

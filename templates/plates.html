@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Number Plate Detection — FaceTech</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/plates.css') }}" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css" />
+</head>
+<body>
+  {% include '_navigation.html' %}
+
+  <main class="main-content">
+
+    <!-- Page header -->
+    <header class="header">
+      <div>
+        <h1><i class="bi bi-car-front-fill plate-title-icon"></i> Number Plate Detection</h1>
+        <p class="subtitle">AI-powered ANPR — fully separate from facial recognition</p>
+      </div>
+      <div class="header-right">
+        <div class="status">
+          <span>System Status: <strong>Active</strong></span>
+          <small id="lastScanTime">Waiting for camera…</small>
+        </div>
+        <div class="profile-icon">
+          <i class="bi bi-person-circle"></i>
+        </div>
+      </div>
+    </header>
+
+    <!-- Stats row -->
+    <section class="stats-cards plate-stats">
+      <div class="card anpr-stat-card">
+        <div><h4>Session Detections</h4><i class="bi bi-car-front-fill"></i></div>
+        <div class="card-main">
+          <span class="stat-number" id="statSession">0</span>
+        </div>
+        <div class="stat-change" id="statSessionNote">This session</div>
+      </div>
+      <div class="card anpr-stat-card">
+        <div><h4>Unique Plates</h4><i class="bi bi-fingerprint"></i></div>
+        <div class="card-main">
+          <span class="stat-number" id="statUnique">0</span>
+        </div>
+        <div class="stat-change">Distinct plate numbers</div>
+      </div>
+      <div class="card anpr-stat-card">
+        <div><h4>Plates Today</h4><i class="bi bi-calendar-check"></i></div>
+        <div class="card-main">
+          <span class="stat-number" id="statToday">—</span>
+        </div>
+        <div class="stat-change">From database</div>
+      </div>
+      <div class="card anpr-stat-card">
+        <div><h4>Camera Status</h4><i class="bi bi-camera-video"></i></div>
+        <div class="card-main">
+          <span class="stat-number plate-cam-status-badge" id="statCamStatus">OFF</span>
+        </div>
+        <div class="stat-change" id="statCamNote">Not connected</div>
+      </div>
+    </section>
+
+    <!-- Main two-column layout -->
+    <section class="plate-main-grid">
+
+      <!-- LEFT: Live camera feed -->
+      <div class="plate-feed-col">
+        <div class="plate-cam-card">
+          <div class="plate-cam-header">
+            <div class="plate-cam-title">
+              <i class="bi bi-camera-video-fill"></i>
+              <span>Live Plate Camera</span>
+              <span class="anpr-badge">ANPR</span>
+            </div>
+            <span class="status-indicator status-offline" id="plateCamStatus">OFFLINE</span>
+          </div>
+
+          <!-- Video container with canvas overlay -->
+          <div class="plate-video-wrap" id="plateVideoWrap">
+            <video id="plateVideo" autoplay playsinline></video>
+            <canvas id="plateCanvas"></canvas>
+            <div class="plate-offline-overlay" id="plateOffline">
+              <i class="bi bi-car-front-fill"></i>
+              <p>Camera Offline</p>
+              <small>Click Connect to start scanning</small>
+            </div>
+            <!-- Scanning animation -->
+            <div class="plate-scan-line" id="plateScanLine"></div>
+          </div>
+
+          <div class="plate-cam-footer">
+            <div class="plate-cam-meta">
+              <small><i class="bi bi-camera"></i> <span id="plateCamLabel">ANPR-01</span></small>
+              <small><i class="bi bi-speedometer2"></i> 2 fps inference</small>
+            </div>
+            <div class="plate-cam-controls">
+              <button class="btn-plate-connect" id="plateCamBtn" onclick="plateToggle()">
+                <i class="bi bi-camera-video-fill"></i> Connect
+              </button>
+              <button class="btn-plate-snap" id="plateSnapBtn" onclick="plateSnapshot()" disabled>
+                <i class="bi bi-camera"></i> Snapshot
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Last detected plate highlight -->
+        <div class="last-plate-card" id="lastPlateCard" style="display:none">
+          <div class="last-plate-label">Last Detected Plate</div>
+          <div class="last-plate-value" id="lastPlateValue">—</div>
+          <div class="last-plate-meta" id="lastPlateMeta"></div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Detection log + history table -->
+      <div class="plate-log-col">
+
+        <!-- Live detection log -->
+        <div class="plate-log-card">
+          <div class="plate-log-header">
+            <h3><i class="bi bi-list-ul"></i> Live Detection Log</h3>
+            <button class="btn-clear-plates" onclick="clearPlateLog()">
+              <i class="bi bi-trash3"></i> Clear
+            </button>
+          </div>
+          <div id="plateLogContainer" class="plate-log-body">
+            <div class="plate-empty-state" id="plateEmptyState">
+              <i class="bi bi-camera-video-off"></i>
+              <p>No plates detected yet</p>
+              <small>Connect the camera and point it at a number plate</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Database history table -->
+        <div class="plate-history-card">
+          <div class="plate-log-header">
+            <h3><i class="bi bi-database"></i> Detection History</h3>
+            <div class="plate-history-filters">
+              <select id="historyRange" onchange="loadHistory()" class="plate-range-select">
+                <option value="today">Today</option>
+                <option value="week">This Week</option>
+                <option value="month">This Month</option>
+                <option value="all" selected>All Time</option>
+              </select>
+            </div>
+          </div>
+          <div class="plate-history-body">
+            <table class="plate-table" id="plateHistoryTable">
+              <thead>
+                <tr>
+                  <th><i class="bi bi-car-front-fill"></i> Plate</th>
+                  <th><i class="bi bi-percent"></i> Conf</th>
+                  <th><i class="bi bi-camera"></i> Camera</th>
+                  <th><i class="bi bi-clock"></i> Time</th>
+                  <th><i class="bi bi-calendar3"></i> Date</th>
+                </tr>
+              </thead>
+              <tbody id="plateHistoryBody">
+                <tr class="table-empty-row">
+                  <td colspan="5">Loading history…</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="plate-history-footer">
+            <small id="historyCount">— records</small>
+            <button class="btn-refresh-history" onclick="loadHistory()">
+              <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <script src="{{ url_for('static', filename='js/plates_page.js') }}"></script>
+</body>
+</html>

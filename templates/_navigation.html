@@ -25,6 +25,10 @@
             <i class="bi bi-search nav-icon"></i>
             <span class="nav-text">Search</span>
         </a>
+        <a href="{{ url_for('plates_page') }}" class="nav-item {{ 'active' if current_page == 'plates' else '' }}" title="Number Plate Detection">
+            <i class="bi bi-car-front-fill nav-icon"></i>
+            <span class="nav-text">Plate Detection</span>
+        </a>
         <a href="{{ url_for('calendar_page') }}" class="nav-item {{ 'active' if current_page == 'calendar' else '' }}" title="Calendar View">
             <i class="bi bi-calendar-date nav-icon"></i>
             <span class="nav-text">Calendar</span>

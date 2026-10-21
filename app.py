@@ -22,7 +22,11 @@ from insforge_db import (
     get_peak_hours,
     get_recent_incidents,
     save_incident,
-    get_all_incidents
+    get_all_incidents,
+    # plate records — separate table, separate functions
+    save_plate_record,
+    get_plate_records,
+    get_plate_kpi_counts,
 )
 import cv2
 from werkzeug.utils import secure_filename
@@ -42,6 +46,16 @@ except ImportError as e:
     print(f"Warning: Classifier not available: {e}")
     CLASSIFIER_AVAILABLE = False
 
+# Number-plate detection — fully isolated from the face-recognition system
+try:
+    from plate_detector import detect_plates
+    PLATE_DETECTOR_AVAILABLE = True
+    print("Plate detector loaded successfully")
+except ImportError as e:
+    print(f"Warning: Plate detector not available: {e}")
+    detect_plates = None
+    PLATE_DETECTOR_AVAILABLE = False
+
 # Configuration
 DATASET_DIR = './facedata'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
@@ -55,6 +69,10 @@ next_face_id = 0
 # RTSPCamera._last_save_ts.
 WEBCAM_SAVE_COOLDOWN_SECONDS = 30.0
 _webcam_last_save_ts: dict = {}
+
+# Number-plate dedup — same 30 s cooldown, keyed by plate text
+PLATE_SAVE_COOLDOWN_SECONDS = 30.0
+_plate_last_save_ts: dict = {}
 
 
 app = Flask(__name__)
@@ -297,6 +315,12 @@ def add_incident():
 def search_page():
     """Search page for finding face records"""
     return render_template('search.html', current_page='search')
+
+
+@app.route('/plates')
+def plates_page():
+    """Dedicated number plate detection page (ANPR) — separate from facial recognition."""
+    return render_template('plates.html', current_page='plates')
 
 
 @app.route('/calendar')
@@ -558,6 +582,103 @@ def camera_configure(cam_id):
     if ok:
         return jsonify({'success': True, 'message': f'Camera {cam_id} reconfigured'})
     return jsonify({'success': False, 'error': f'Camera {cam_id} not found'}), 404
+
+
+# ======================================================
+# Number Plate Detection Routes
+# Completely separate from the face recognition system.
+# ======================================================
+
+@app.route('/api/plates/detect', methods=['POST'])
+def plates_detect():
+    """
+    ANPR endpoint — mirrors /getdata/ but for number plates.
+
+    Request body (JSON):
+        { "image": "<base64 JPEG>", "camera_id": "<optional cam label>" }
+
+    Response:
+        Array of plate detection objects:
+        [{ bbox, plate_text, confidence, status, label, color, track_id }, …]
+    """
+    if not PLATE_DETECTOR_AVAILABLE:
+        return jsonify([{
+            'bbox': [50, 50, 250, 100],
+            'plate_text': 'DEMO MODE',
+            'confidence': 0.0,
+            'status': 'detected',
+            'label': 'DEMO MODE',
+            'color': '#f5a623',
+            'track_id': 1,
+        }])
+
+    data       = request.get_json(force=True) or {}
+    image_b64  = data.get('image', '')
+    camera_id  = data.get('camera_id', 'CAM-PLATE')
+
+    # Decode base64 frame
+    try:
+        if ',' in image_b64:
+            image_b64 = image_b64.split(',')[1]
+        image_data = base64.b64decode(image_b64)
+        arr        = np.frombuffer(image_data, np.uint8)
+        frame      = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if frame is None:
+            raise ValueError("imdecode returned None")
+    except Exception as e:
+        return jsonify(error=f"Invalid image data: {e}"), 400
+
+    try:
+        results = detect_plates(frame)
+    except Exception as e:
+        print(f"Plate detection error: {e}")
+        return jsonify(error=f"Plate detection failed: {e}"), 500
+
+    # Persist to InsForge (deduped by plate text, 30 s cooldown)
+    now_s = time.time()
+    for det in results:
+        key  = det['plate_text']
+        last = _plate_last_save_ts.get(key, 0.0)
+        if now_s - last >= PLATE_SAVE_COOLDOWN_SECONDS:
+            try:
+                save_plate_record(
+                    plate_text=key,
+                    confidence=det['confidence'],
+                    bbox=det['bbox'],
+                    status=det['status'],
+                    camera_id=str(camera_id),
+                )
+                _plate_last_save_ts[key] = now_s
+            except Exception as db_err:
+                print(f"Plate DB save error: {db_err}")
+        # Prune stale dedup entries
+        for k in list(_plate_last_save_ts):
+            if now_s - _plate_last_save_ts[k] > 300:
+                del _plate_last_save_ts[k]
+
+    return jsonify(results)
+
+
+@app.route('/api/plates/records')
+def plates_records():
+    """Return recent plate detection records from InsForge."""
+    time_range = request.args.get('range', 'all')
+    try:
+        records = get_plate_records(time_range)
+        return jsonify(records)
+    except Exception as e:
+        return jsonify(error=str(e)), 500
+
+
+@app.route('/api/plates/kpi')
+def plates_kpi():
+    """Return plate detection KPI counts for the dashboard stats card."""
+    time_range = request.args.get('range', 'today')
+    try:
+        count = get_plate_kpi_counts(time_range)
+        return jsonify({'count': count, 'range': time_range})
+    except Exception as e:
+        return jsonify(error=str(e)), 500
 
 
 # ======================================================
